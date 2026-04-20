@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        应用主主题
+        适配状态栏和导航栏，与App深色风格一致
+    -->
+    <style name="Theme.InvestmentManager" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 状态栏透明，与App背景融合 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 导航栏透明 -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- 确保内容延伸到状态栏下方 -->
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowTranslucentNavigation">false</item>
+    </style>
+
+    <!--
+        优化后的启动主题 - 使用单层启动屏方案
+        参考: Google官方推荐 + 支付宝/微信等成熟App实践
+        核心原则:
+        1. 只使用系统SplashScreen API，移除自定义启动屏
+        2. 保持启动图标和App内Logo一致（使用原有的ic_launcher）
+        3. 最小化启动时间，不添加人为延迟
+    -->
+    <style name="Theme.AppSplash" parent="Theme.SplashScreen">
+        <!-- 窗口背景 - 使用与Logo配色协调的深色背景 -->
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+
+        <!--
+            启动图标 - 使用应用原有的Logo（先生投资）
+            保持品牌一致性
+        -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+
+        <!-- 图标背景色 - 与Logo金色配色协调的深色背景 -->
+        <item name="windowSplashScreenIconBackgroundColor">@color/splash_icon_background</item>
+
+        <!--
+            动画时长限制 (最大1000ms，系统强制)
+            不要设置过长，用户希望快速进入应用
+        -->
+        <item name="windowSplashScreenAnimationDuration">300</item>
+
+        <!-- 启动后切换的主题 -->
+        <item name="postSplashScreenTheme">@style/Theme.InvestmentManager</item>
+
+        <!--
+            启动屏期间状态栏处理
+            使用透明状态栏，与App风格一致
+        -->
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+    </style>
+</resources>

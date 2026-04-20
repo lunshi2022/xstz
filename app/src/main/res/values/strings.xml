@@ -1,0 +1,155 @@
+<resources>
+    <string name="app_name">先生投资</string>
+    
+    <!-- Bottom Navigation -->
+    <string name="nav_home">首页</string>
+    <string name="nav_charts">图表</string>
+    <string name="nav_balance">再平衡</string>
+    <string name="nav_settings">设置</string>
+    
+    <!-- Home -->
+    <string name="total_assets">总资产</string>
+    <string name="principal">本金</string>
+    <string name="total_return">累计收益</string>
+    <string name="return_rate">收益率</string>
+    <string name="my_holdings">我的持仓</string>
+    <string name="add_fund">添加基金</string>
+    <string name="refresh">刷新</string>
+    <string name="record_nav">记录净值</string>
+    <string name="last_update">上次更新: %s</string>
+    <string name="realtime_updating">实时更新中...</string>
+    
+    <!-- Fund Item -->
+    <string name="current_price">当前价</string>
+    <string name="change_percent">涨跌幅</string>
+    <string name="market_value">持仓市值</string>
+    <string name="ratio">占比</string>
+    <string name="deviation">偏差值</string>
+    <string name="status">状态</string>
+    <string name="status_normal">正常</string>
+    <string name="status_rebalance">需平衡</string>
+    <string name="status_critical">严重偏离</string>
+    
+    <!-- Fund Detail -->
+    <string name="fund_detail">基金详情</string>
+    <string name="fund_code">基金代码</string>
+    <string name="fund_type">基金类型</string>
+    <string name="target_ratio">目标比例</string>
+    <string name="cost_price">成本价</string>
+    <string name="float_profit">浮动盈亏</string>
+    <string name="holding_quantity">持有份额</string>
+    <string name="edit_holdings">修改持仓</string>
+    <string name="buy">买入</string>
+    <string name="sell">卖出</string>
+    <string name="remove">移除</string>
+    <string name="fund_history">历史走势</string>
+    
+    <!-- Asset Type -->
+    <string name="asset_stock">股票</string>
+    <string name="asset_bond">债券</string>
+    <string name="asset_gold">黄金</string>
+    <string name="asset_cash">现金</string>
+    
+    <!-- Add/Edit Fund -->
+    <string name="fund_code_hint">请输入6位基金代码</string>
+    <string name="asset_category">资产类别</string>
+    <string name="holding_quantity_hint">持有份额</string>
+    <string name="total_cost_hint">投入本金</string>
+    <string name="market_value_hint">持仓市值</string>
+    <string name="cost_price_hint">成本价</string>
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+    <string name="input_by_quantity">按份额输入</string>
+    <string name="input_by_value">按市值输入</string>
+    
+    <!-- Rebalance -->
+    <string name="current_allocation">当前配置</string>
+    <string name="target_allocation">目标配置</string>
+    <string name="adjustment_suggestions">调整建议</string>
+    <string name="strategy">策略</string>
+    <string name="strategy_smart">智能买卖</string>
+    <string name="strategy_average">平均买卖</string>
+    <string name="strategy_fill">填坑买卖</string>
+    <string name="confirm_rebalance">确认再平衡</string>
+    <string name="adjust_amount">调整金额</string>
+    <string name="buy_in">买入</string>
+    <string name="sell_out">卖出</string>
+    
+    <!-- Charts -->
+    <string name="asset_overview">资产总览</string>
+    <string name="return_trend">收益走势</string>
+    <string name="asset_flow">资产配置流</string>
+    <string name="last_7_days">近7天</string>
+    <string name="last_1_month">近1月</string>
+    <string name="last_3_months">近3月</string>
+    <string name="last_1_year">近1年</string>
+    <string name="custom_range">自定义</string>
+    
+    <!-- Settings -->
+    <string name="display_settings">显示设置</string>
+    <string name="theme_mode">主题模式</string>
+    <string name="theme_auto">自动</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="color_theme">颜色主题</string>
+    <string name="color_monet">自动莫奈取色</string>
+    <string name="color_classic">经典蓝</string>
+    <string name="font_size">字体大小</string>
+    <string name="font_small">小</string>
+    <string name="font_medium">中</string>
+    <string name="font_large">大</string>
+    
+    <string name="target_allocation_settings">目标配置比例</string>
+    <string name="stock_ratio">股票: %s%%</string>
+    <string name="bond_ratio">债券: %s%%</string>
+    <string name="gold_ratio">黄金: %s%%</string>
+    <string name="cash_ratio">现金: %s%%</string>
+    <string name="ratio_sum_error">比例总和必须为100%%</string>
+    
+    <string name="threshold_settings">阈值设置</string>
+    <string name="rebalance_threshold">再平衡阈值: %s%%</string>
+    <string name="refresh_frequency">刷新频率: %s秒</string>
+    
+    <string name="data_management">数据管理</string>
+    <string name="export_data">导出数据</string>
+    <string name="import_data">导入数据</string>
+    <string name="clear_records">清空记录</string>
+    
+    <string name="about">关于</string>
+    <string name="version">版本 %s</string>
+    <string name="help">使用说明</string>
+    
+    <!-- Dialog -->
+    <string name="confirm_operation">确认操作</string>
+    <string name="confirm_remove_fund">确定要移除该基金吗？</string>
+    <string name="confirm_rebalance_operation">确定要执行再平衡操作吗？</string>
+    <string name="confirm_sell_operation">确定要卖出吗？</string>
+    <string name="confirm_clear_records">确定要清空所有记录吗？此操作不可恢复。</string>
+    
+    <!-- Record Nav -->
+    <string name="nav_record">记录净值</string>
+    <string name="record_nav_success">净值记录成功</string>
+    <string name="record_nav_failed">净值记录失败</string>
+    
+    <!-- Fund Operation -->
+    <string name="enter_amount">请输入金额</string>
+    <string name="operation_success">操作成功</string>
+    <string name="operation_failed">操作失败</string>
+    
+    <!-- Time -->
+    <string name="today">今天</string>
+    <string name="yesterday">昨天</string>
+    
+    <!-- Export -->
+    <string name="export_holdings">导出持仓记录</string>
+    <string name="export_transactions">导出交易记录</string>
+    <string name="export_success">导出成功: %s</string>
+    <string name="export_failed">导出失败</string>
+    
+    <!-- Common -->
+    <string name="loading">加载中...</string>
+    <string name="error_network">网络错误，请检查网络连接</string>
+    <string name="error_data_fetch">获取数据失败</string>
+    <string name="error_invalid_code">无效的基金代码</string>
+    <string name="try_again">重试</string>
+</resources>

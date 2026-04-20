@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 夜间模式主主题 -->
+    <style name="Theme.InvestmentManager" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 状态栏透明，与App背景融合 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 导航栏透明 -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- 确保内容延伸到状态栏下方 -->
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowTranslucentNavigation">false</item>
+    </style>
+
+    <!-- 夜间模式启动主题 - 使用原有的Logo -->
+    <style name="Theme.AppSplash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background_dark</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/splash_icon_background_dark</item>
+        <item name="windowSplashScreenAnimationDuration">300</item>
+        <item name="postSplashScreenTheme">@style/Theme.InvestmentManager</item>
+        <item name="android:statusBarColor">@color/splash_background_dark</item>
+        <item name="android:navigationBarColor">@color/splash_background_dark</item>
+    </style>
+</resources>
