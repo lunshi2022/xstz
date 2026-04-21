@@ -309,7 +309,7 @@ fun MainContent(
                 val downloadUtil = DownloadUtil(context)
                 val fileName = "xstz-update-${autoUpdateInfo!!.versionName}.apk"
                 val downloadId = downloadUtil.downloadApk(autoUpdateInfo!!.downloadUrl, fileName)
-                downloadUtil.registerDownloadCompleteListener(downloadId) { uri ->
+                downloadUtil.registerDownloadCompleteListener(downloadId, fileName) { uri ->
                     InstallUtil.installApk(context, uri)
                 }
                 showAutoUpdateDialog = false

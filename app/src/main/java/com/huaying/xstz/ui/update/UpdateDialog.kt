@@ -115,8 +115,20 @@ fun UpdateCheckErrorDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("检查更新失败") },
-        text = { Text("无法检查更新：$errorMessage") },
+        title = { 
+            Text(
+                text = "检查更新失败",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            ) 
+        },
+        text = { 
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            ) 
+        },
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text("知道了")

@@ -29,7 +29,7 @@ data class Fund(
     val currentPrice: Double = 0.0,  // 当前价格
     val changePercent: Double = 0.0,  // 涨跌幅
     
-    val targetRatio: Double = 25.0,  // 目标比例
+    val targetRatio: Double = 0.0,  // 目标比例（0.0-1.0，表示0%-100%）
     
     val createdAt: Long = TimeRepository.getCurrentTimeMillis(),
     val updatedAt: Long = TimeRepository.getCurrentTimeMillis()

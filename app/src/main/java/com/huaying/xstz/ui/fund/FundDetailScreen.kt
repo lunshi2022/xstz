@@ -379,7 +379,8 @@ fun FundDetailScreen(
     onEditTargetRatio: (Fund, Double) -> Unit,
     onEditAssetType: (Fund, AssetType) -> Unit,
     onDelete: () -> Unit,
-    onNavigateToTransactionHistory: () -> Unit
+    onNavigateToTransactionHistory: () -> Unit,
+    onNavigateToTargetAllocation: () -> Unit = {}
 ) {
     Log.d("FundDetail", "Rendering FundDetailScreen for fund: ${fund.name} (id: ${fund.id})")
 
@@ -603,7 +604,7 @@ fun FundDetailScreen(
                             indication = null
                         ) {
                             OperationLogger.logButtonClick("修改目标比例", "基金详情")
-                            showRatioDialog = true
+                            onNavigateToTargetAllocation()
                         },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically

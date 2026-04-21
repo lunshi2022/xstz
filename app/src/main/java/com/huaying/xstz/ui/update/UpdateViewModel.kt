@@ -83,7 +83,7 @@ class UpdateViewModel(context: Context) : ViewModel() {
         updateInfo?.let { info ->
             val fileName = "xstz-update-${info.versionName}.apk"
             val downloadId = downloadUtil.downloadApk(info.downloadUrl, fileName)
-            downloadUtil.registerDownloadCompleteListener(downloadId) { uri ->
+            downloadUtil.registerDownloadCompleteListener(downloadId, fileName) { uri ->
                 InstallUtil.installApk(appContext, uri)
             }
             dismissUpdateDialog()

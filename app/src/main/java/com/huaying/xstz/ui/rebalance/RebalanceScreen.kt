@@ -293,6 +293,17 @@ fun RebalanceScreen(
                 // 计算当前目标占比总和
                 val totalTargetRatio = funds.filter { it.type != AssetType.CASH }.sumOf { it.targetRatio }
                 val isValidRatio = abs(totalTargetRatio - 1.0) < 0.01
+                
+                // 计算是否有基金严重偏离目标配置
+                val totalAssets = funds.sumOf { it.holdingQuantity * it.currentPrice }
+                val hasSevereDeviation = if (totalAssets > 0) {
+                    funds.any { fund ->
+                        val currentRatio = (fund.holdingQuantity * fund.currentPrice) / totalAssets * 100
+                        val targetRatio = fund.targetRatio * 100
+                        val deviation = kotlin.math.abs(currentRatio - targetRatio)
+                        deviation > 10.0 // 偏离超过10%认为需要调整
+                    }
+                } else false
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -318,9 +329,9 @@ fun RebalanceScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            // 骨架屏或实际内容
+                            // 只在需要调整时显示提示
                             if (!isDataLoaded) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 // 骨架屏占位符 - 模拟文字行
                                 Box(
                                     modifier = Modifier
@@ -328,13 +339,19 @@ fun RebalanceScreen(
                                         .height(16.dp)
                                         .background(shimmerBrush, shape = MaterialTheme.shapes.small)
                                 )
-                            } else {
+                            } else if (!isValidRatio) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (isValidRatio) "当前总目标: 100% ✓"
-                                           else "当前总目标: %.2f%% ⚠ 需调整".format(Locale.CHINA, totalTargetRatio * 100),
+                                    text = "非现金资产占比: %.2f%% ⚠ 需调整".format(Locale.CHINA, totalTargetRatio * 100),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (isValidRatio) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.error
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else if (hasSevereDeviation) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "部分基金偏离目标配置 ⚠ 需调整",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
                         }

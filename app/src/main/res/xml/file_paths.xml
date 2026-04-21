@@ -8,6 +8,10 @@
     <external-path
         name="downloads"
         path="Download/" />
+    <!-- 应用外部文件目录（Android/data/包名/files/） -->
+    <external-files-path
+        name="external_app_files"
+        path="." />
     <!-- 缓存目录 -->
     <cache-path
         name="cache"

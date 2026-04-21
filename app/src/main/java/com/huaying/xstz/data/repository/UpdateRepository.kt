@@ -2,21 +2,38 @@ package com.huaying.xstz.data.repository
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.huaying.xstz.data.api.GitHubApi
 import com.huaying.xstz.data.model.UpdateInfo
 import com.huaying.xstz.data.model.UpdateResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.UnknownHostException
+import java.net.SocketTimeoutException
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 /**
  * 应用更新检查仓库
  */
 class UpdateRepository(private val context: Context) {
 
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .proxy(Proxy.NO_PROXY) // 禁用代理，避免被系统代理干扰
+        .build()
+
     private val retrofit = Retrofit.Builder()
         .baseUrl("https://api.github.com/")
+        .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
@@ -31,6 +48,11 @@ class UpdateRepository(private val context: Context) {
     suspend fun checkForUpdate(owner: String, repo: String): UpdateResult {
         return withContext(Dispatchers.IO) {
             try {
+                // 先检查网络连接
+                if (!isNetworkAvailable()) {
+                    return@withContext UpdateResult(hasUpdate = false, error = "网络连接不可用，请检查网络设置")
+                }
+
                 val release = api.getLatestRelease(owner, repo)
                 val latestVersionName = release.tag_name.removePrefix("v")
                 val currentVersionCode = getCurrentVersionCode()
@@ -59,10 +81,26 @@ class UpdateRepository(private val context: Context) {
                 } else {
                     UpdateResult(hasUpdate = false)
                 }
+            } catch (e: UnknownHostException) {
+                UpdateResult(hasUpdate = false, error = "无法连接到服务器，请检查网络设置")
+            } catch (e: SocketTimeoutException) {
+                UpdateResult(hasUpdate = false, error = "连接超时，请稍后重试")
+            } catch (e: IOException) {
+                UpdateResult(hasUpdate = false, error = "网络连接失败，请检查网络设置")
             } catch (e: Exception) {
-                UpdateResult(hasUpdate = false, error = e.message)
+                UpdateResult(hasUpdate = false, error = "检查更新失败，请稍后重试")
             }
         }
+    }
+
+    /**
+     * 检查网络是否可用
+     */
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     /**

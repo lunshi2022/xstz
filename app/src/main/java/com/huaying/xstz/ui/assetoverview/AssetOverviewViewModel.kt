@@ -558,31 +558,40 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
         }
         val severeThreshold = normalThreshold * 2.0
         
-        // 如果偏离导致的交易额不足1手（100股），则强制显示为正常
-        if (fund.currentPrice > 0) {
-            val deviationValue = totalAssets * (deviation / 100.0)
-            val deviationShares = deviationValue / fund.currentPrice
-            
-            // 1. 基础检查：变动数量不足100股
-            if (deviationShares < 100) {
-                return "正常"
-            }
-            
-            // 2. 流动性检查：如果是需要买入（负偏离），检查是否有足够的资金（来自卖出其他资产）
-            val realDeviation = currentRatio - targetRatioPercent
-            if (realDeviation < 0) { // 需要买入
-                val costToBuy100 = fund.currentPrice * 100
-                if (estimatedLiquidity < costToBuy100) {
-                    return "正常" // 资金不足以买入最少1手，显示正常
-                }
-            }
-        }
-
-        return when {
+        // 先根据偏离程度判断状态
+        val status = when {
             deviation > severeThreshold -> "严重偏离"
             deviation > normalThreshold -> "需平衡"
             else -> "正常"
         }
+        
+        // 如果已经是正常，直接返回
+        if (status == "正常") return "正常"
+        
+        // 检查是否因交易限制无法操作
+        // 只有当变动确实很小（<100股）时才显示为正常
+        // 如果偏离很大但只是因为单只基金持仓过多，仍然显示真实状态
+        if (fund.currentPrice > 0) {
+            val deviationValue = totalAssets * (deviation / 100.0)
+            val deviationShares = deviationValue / fund.currentPrice
+            
+            // 只有变动数量确实很少（不足100股）且偏离不大（<5%）时才显示正常
+            if (deviationShares < 100 && deviation < 5.0) {
+                return "正常"
+            }
+            
+            // 流动性检查：如果是需要买入（负偏离），检查是否有足够的资金
+            val realDeviation = currentRatio - targetRatioPercent
+            if (realDeviation < 0) { // 需要买入
+                val costToBuy100 = fund.currentPrice * 100
+                if (estimatedLiquidity < costToBuy100) {
+                    // 资金不足，但偏离很大，仍然显示真实状态
+                    return status
+                }
+            }
+        }
+
+        return status
     }
     
     override fun onCleared() {

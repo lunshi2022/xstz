@@ -212,8 +212,12 @@ fun TransactionItemRow(transaction: Transaction, isCash: Boolean) {
     dateFormat.timeZone = TimeZone.getTimeZone("GMT+8")
     val dateStr = dateFormat.format(Date(transaction.createdAt))
     
+    // 判断是否为收入（卖出/转出是收入，显示绿色）
     val isIncome = transaction.type == TransactionType.SELL || transaction.type == TransactionType.WITHDRAW
-    val amountColor = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    // 收入显示绿色，支出显示红色
+    val amountColor = if (isIncome) SuccessGreen else DangerRed
+    // 只显示绝对值，不显示正负号
+    val displayAmount = abs(transaction.amount)
 
     // 根据是否为现金账户决定显示的交易类型文本
     val transactionTypeText = if (isCash) {
@@ -244,7 +248,7 @@ fun TransactionItemRow(transaction: Transaction, isCash: Boolean) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "¥%,.2f".format(Locale.CHINA, if (transaction.type == TransactionType.BUY) abs(transaction.amount) else -abs(transaction.amount)),
+                text = "¥%,.2f".format(Locale.CHINA, displayAmount),
                 style = MaterialTheme.typography.titleMedium,
                 color = amountColor,
                 fontWeight = FontWeight.Bold

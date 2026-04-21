@@ -280,7 +280,7 @@ fun MainScreen(
             ) {
                 val funds by repository.getAllFunds().collectAsState(initial = emptyList())
                 TargetAllocationScreen(
-                    funds = funds.filter { it.type != AssetType.CASH },
+                    funds = funds,
                     isDarkMode = darkTheme,
                     onBack = { navController.popBackStack() },
                     onSave = { updatedFunds ->
@@ -390,7 +390,8 @@ fun MainScreen(
                             }
                         },
                         onDelete = { showDeleteDialog = true },
-                        onNavigateToTransactionHistory = { navController.navigate("transactionHistory/$fundId") }
+                        onNavigateToTransactionHistory = { navController.navigate("transactionHistory/$fundId") },
+                        onNavigateToTargetAllocation = { navController.navigate("targetAllocation") }
                     )
                 }
 
