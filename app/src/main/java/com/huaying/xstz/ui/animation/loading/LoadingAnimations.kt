@@ -90,8 +90,8 @@ fun AnimatedContentLoader(
                     scaleIn(
                         initialScale = 0.8f,
                         animationSpec = spring(
-                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
                         )
                     ),
             exit = fadeOut(animationSpec = tween(200)) +

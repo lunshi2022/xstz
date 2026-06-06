@@ -2,8 +2,8 @@
     <string name="app_name">先生投资</string>
     
     <!-- Bottom Navigation -->
-    <string name="nav_home">首页</string>
-    <string name="nav_charts">图表</string>
+    <string name="nav_home">概览</string>
+    <string name="nav_charts">分析</string>
     <string name="nav_balance">再平衡</string>
     <string name="nav_settings">设置</string>
     

@@ -16,6 +16,9 @@ interface FundDao {
     @Query("SELECT * FROM funds WHERE code = :code")
     suspend fun getFundByCode(code: String): Fund?
     
+    @Query("SELECT * FROM funds WHERE code = :code AND name = :name")
+    suspend fun getFundByCodeAndName(code: String, name: String): Fund?
+    
     @Query("SELECT * FROM funds WHERE type = :type")
     fun getFundsByType(type: AssetType): Flow<List<Fund>>
     

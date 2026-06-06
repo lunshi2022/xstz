@@ -19,6 +19,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 import com.huaying.xstz.data.PreferenceManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 data class AssetSummary(
     val totalAssets: Double = 0.0,
@@ -39,6 +42,90 @@ data class AssetSummary(
     val isRefreshing: Boolean = false,
     val rebalanceThreshold: Double = 20.0,
     val isPrivacyMode: Boolean = false
+)
+
+enum class TimeRange(val displayName: String) {
+    WEEK("近1周"),
+    MONTH("近1月"),
+    YEAR("今年以来")
+}
+
+enum class ChartDataType(val displayName: String) {
+    RETURN_RATE("收益率"),
+    ASSET_RATIO("资产占比"),
+    ASSET_COMPARISON("资产对比")
+}
+
+/**
+ * 图表数据缓存键
+ */
+internal data class ChartCacheKey(
+    val timeRange: TimeRange,
+    val dataType: ChartDataType,
+    val dataSize: Int
+)
+
+/**
+ * 图表数据缓存管理器
+ * 参考：LRU缓存策略，最大缓存10个条目
+ */
+internal object TrendChartDataCache {
+    private val cache = ConcurrentHashMap<ChartCacheKey, TrendChartData>()
+    private const val MAX_CACHE_SIZE = 10
+    private val accessOrder = mutableListOf<ChartCacheKey>()
+
+    internal fun get(key: ChartCacheKey): TrendChartData? {
+        val data = cache[key]
+        if (data != null) {
+            // 更新访问顺序（LRU）
+            synchronized(accessOrder) {
+                accessOrder.remove(key)
+                accessOrder.add(key)
+            }
+        }
+        return data
+    }
+
+    internal fun put(key: ChartCacheKey, data: TrendChartData) {
+        synchronized(accessOrder) {
+            if (cache.size >= MAX_CACHE_SIZE && !cache.containsKey(key)) {
+                // 移除最久未访问的条目
+                accessOrder.firstOrNull()?.let { oldestKey ->
+                    cache.remove(oldestKey)
+                    accessOrder.remove(oldestKey)
+                }
+            }
+            cache[key] = data
+            accessOrder.remove(key)
+            accessOrder.add(key)
+        }
+    }
+
+    internal fun clear() {
+        synchronized(accessOrder) {
+            cache.clear()
+            accessOrder.clear()
+        }
+    }
+
+    internal fun generateKey(timeRange: TimeRange, dataType: ChartDataType, records: List<NetValueRecord>): ChartCacheKey {
+        return ChartCacheKey(timeRange, dataType, records.size)
+    }
+}
+
+data class ChartDataPoint(
+    val date: Long,
+    val value: Double,
+    val label: String
+)
+
+data class TrendChartData(
+    val dataPoints: List<ChartDataPoint>,
+    val minValue: Double,
+    val maxValue: Double,
+    val currentValue: Double,
+    val changeValue: Double,
+    val changePercent: Double
 )
 
 sealed class AssetOverviewUiState {
@@ -80,16 +167,32 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
     private var currentPrivacyMode: Boolean = false // Current privacy mode state
     private var initialInvestmentDate: Long = 0 // 初始投资日期
 
+    // 趋势图表相关状态
+    private val _selectedTimeRange = MutableStateFlow(TimeRange.WEEK)
+    val selectedTimeRange: StateFlow<TimeRange> = _selectedTimeRange.asStateFlow()
+
+    private val _selectedChartDataType = MutableStateFlow(ChartDataType.RETURN_RATE)
+    val selectedChartDataType: StateFlow<ChartDataType> = _selectedChartDataType.asStateFlow()
+
+    private val _trendChartData = MutableStateFlow<TrendChartData?>(null)
+    val trendChartData: StateFlow<TrendChartData?> = _trendChartData.asStateFlow()
+
     // 缓存交易日状态，避免频繁调用网络接口
     private var cachedTradingDay: org.threeten.bp.LocalDate? = null
     private var cachedIsTradingDay: Boolean? = null
     private var lastTradingDayCheckTime: Long = 0
     private val TRADING_DAY_CACHE_DURATION = 5 * 60 * 1000L // 5分钟缓存
 
+    // 图表数据计算任务
+    private var chartCalculationJob: kotlinx.coroutines.Job? = null
+
     init {
         viewModelScope.launch {
             // 初始化默认配置
             repository.initDefaultTargetAllocation()
+
+            // 初始化时加载默认的趋势图表数据（近1周收益率）
+            loadTrendChartData()
 
             // Get initial privacy mode setting
             currentPrivacyMode = preferenceManager.privacyModeEnabled.first()
@@ -203,10 +306,10 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
         val timeInMinutes = hour * 60 + minute
         
         // 交易时间：9:15-11:30, 13:00-15:00
-        val morningStart = 9 * 60 + 15
-        val morningEnd = 11 * 60 + 30
-        val afternoonStart = 13 * 60
-        val afternoonEnd = 15 * 60
+        9 * 60 + 15
+        11 * 60 + 30
+        13 * 60
+        15 * 60
         
         return when {
             timeInMinutes < 9 * 60 + 15 -> "未开盘"
@@ -607,28 +710,467 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
         if (initialInvestmentDate == 0L) {
             return 0
         }
-        // 使用Calendar计算，基于日期（00:00）而非时间差
-        val calendar = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
-        
-        // 初始投资日期（设置为当天00:00）
+        Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
+
         val startCalendar = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
         startCalendar.timeInMillis = initialInvestmentDate
         startCalendar.set(Calendar.HOUR_OF_DAY, 0)
         startCalendar.set(Calendar.MINUTE, 0)
         startCalendar.set(Calendar.SECOND, 0)
         startCalendar.set(Calendar.MILLISECOND, 0)
-        
-        // 当前日期（设置为当天00:00）
+
         val currentCalendar = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
         currentCalendar.timeInMillis = TimeRepository.getCurrentTimeMillis()
         currentCalendar.set(Calendar.HOUR_OF_DAY, 0)
         currentCalendar.set(Calendar.MINUTE, 0)
         currentCalendar.set(Calendar.SECOND, 0)
         currentCalendar.set(Calendar.MILLISECOND, 0)
-        
-        // 计算日期差（天数）
+
         val diffInMillis = currentCalendar.timeInMillis - startCalendar.timeInMillis
         val diffInDays = diffInMillis / (1000L * 60 * 60 * 24)
-        return diffInDays.toInt() + 1 // +1 because the first day is day 1
+        return diffInDays.toInt() + 1
+    }
+
+    data class FundDailyPnL(
+        val fund: Fund,
+        val dailyReturn: Double,
+        val dailyReturnRate: Double,
+        val currentValue: Double
+    )
+
+    data class DailyPnLData(
+        val date: Calendar,
+        val totalDailyReturn: Double,
+        val totalDailyReturnRate: Double,
+        val fundDetails: List<FundDailyPnL>,
+        val hasRecord: Boolean
+    )
+
+    private val _selectedDate = MutableStateFlow(Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA))
+    val selectedDate: StateFlow<Calendar> = _selectedDate.asStateFlow()
+
+    private val _dailyPnLData = MutableStateFlow<DailyPnLData?>(null)
+    val dailyPnLData: StateFlow<DailyPnLData?> = _dailyPnLData.asStateFlow()
+
+    fun selectDate(date: Calendar) {
+        _selectedDate.value = date
+        loadDailyPnLData(date)
+    }
+
+    private fun loadDailyPnLData(date: Calendar) {
+        viewModelScope.launch {
+            try {
+                val funds = repository.getAllFunds().first()
+                val isToday = isSameDay(date, Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA))
+
+                if (isToday) {
+                    val todayReturn = funds.sumOf { fund ->
+                        val currentValue = fund.holdingQuantity * fund.currentPrice
+                        currentValue * fund.changePercent / 100
+                    }
+                    val todayReturnRate = if (repository.getTotalCost() > 0) {
+                        todayReturn / repository.getTotalCost() * 100
+                    } else 0.0
+
+                    val fundDetails = funds.filter { it.type != AssetType.CASH }.map { fund ->
+                        val currentValue = fund.holdingQuantity * fund.currentPrice
+                        val dailyReturn = currentValue * fund.changePercent / 100
+                        val dailyReturnRate = if (currentValue > 0) fund.changePercent else 0.0
+                        FundDailyPnL(
+                            fund = fund,
+                            dailyReturn = dailyReturn,
+                            dailyReturnRate = dailyReturnRate,
+                            currentValue = currentValue
+                        )
+                    }
+
+                    _dailyPnLData.value = DailyPnLData(
+                        date = date,
+                        totalDailyReturn = todayReturn,
+                        totalDailyReturnRate = todayReturnRate,
+                        fundDetails = fundDetails,
+                        hasRecord = true
+                    )
+                } else {
+                    val dayStart = getDayStart(date).timeInMillis
+                    val dayEnd = getDayEnd(date).timeInMillis
+
+                    val records = repository.getRecordsByDateRange(dayStart, dayEnd).first()
+                    val record = records.firstOrNull()
+
+                    if (record != null) {
+                        val prevRecord = getPreviousRecord(date)
+
+                        val dailyReturn = if (prevRecord != null) {
+                            record.totalAssets - prevRecord.totalAssets
+                        } else 0.0
+
+                        val dailyReturnRate = if (prevRecord != null && prevRecord.totalAssets > 0) {
+                            (record.totalAssets - prevRecord.totalAssets) / prevRecord.totalAssets * 100
+                        } else 0.0
+
+                        val fundDetails = funds.filter { it.type != AssetType.CASH }.map { fund ->
+                            val currentValue = fund.holdingQuantity * fund.currentPrice
+                            val estimatedDailyReturn = currentValue * fund.changePercent / 100
+                            FundDailyPnL(
+                                fund = fund,
+                                dailyReturn = estimatedDailyReturn,
+                                dailyReturnRate = fund.changePercent,
+                                currentValue = currentValue
+                            )
+                        }
+
+                        _dailyPnLData.value = DailyPnLData(
+                            date = date,
+                            totalDailyReturn = dailyReturn,
+                            totalDailyReturnRate = dailyReturnRate,
+                            fundDetails = fundDetails,
+                            hasRecord = true
+                        )
+                    } else {
+                        _dailyPnLData.value = DailyPnLData(
+                            date = date,
+                            totalDailyReturn = 0.0,
+                            totalDailyReturnRate = 0.0,
+                            fundDetails = emptyList(),
+                            hasRecord = false
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    suspend fun getRecordedDates(): Set<Long> {
+        return try {
+            val records = repository.getAllNetValueRecords().first()
+            records.map { record ->
+                val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
+                cal.timeInMillis = record.createdAt
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                cal.timeInMillis
+            }.toSet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+
+    private suspend fun getPreviousRecord(date: Calendar): NetValueRecord? {
+        return try {
+            val dayStart = getDayStart(date).timeInMillis
+            val records = repository.getRecordsSince(0L).first()
+            records.filter { it.createdAt < dayStart }
+                .maxByOrNull { it.createdAt }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun getDayStart(calendar: Calendar): Calendar {
+        val cal = calendar.clone() as Calendar
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal
+    }
+
+    private fun getDayEnd(calendar: Calendar): Calendar {
+        val cal = calendar.clone() as Calendar
+        cal.set(Calendar.HOUR_OF_DAY, 23)
+        cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59)
+        cal.set(Calendar.MILLISECOND, 999)
+        return cal
+    }
+
+    private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+               cal1.get(Calendar.MONTH) == cal2.get(Calendar.MONTH) &&
+               cal1.get(Calendar.DAY_OF_MONTH) == cal2.get(Calendar.DAY_OF_MONTH)
+    }
+
+    fun formatSelectedDate(calendar: Calendar): String {
+        return "%02d月%02d日".format(
+            calendar.get(Calendar.MONTH) + 1,
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    fun getWeekdayString(calendar: Calendar): String {
+        val weekdays = arrayOf("", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")
+        return weekdays[calendar.get(Calendar.DAY_OF_WEEK)]
+    }
+
+    suspend fun getHolidayDatesForCurrentYear(): Pair<Set<Long>, Map<Long, String>> {
+        return try {
+            val currentYear = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA).get(Calendar.YEAR)
+            val holidays = HolidayRepository.getBuiltinHolidaysForCalendar(currentYear)
+
+            val holidayDateSet = mutableSetOf<Long>()
+            val holidayNameMap = mutableMapOf<Long, String>()
+
+            holidays.forEach { localDate ->
+                val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
+                cal.set(localDate.year, localDate.monthValue - 1, localDate.dayOfMonth, 0, 0, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                val timestamp = cal.timeInMillis
+                holidayDateSet.add(timestamp)
+
+                val month = localDate.monthValue
+                val day = localDate.dayOfMonth
+                val name = when (month) {
+                    1 -> if (day == 1) "元旦" else null
+                    2 -> when {
+                        day in 16..23 -> "春节"
+                        else -> null
+                    }
+                    4 -> if (day in 4..6) "清明" else null
+                    5 -> if (day in 1..5) "劳动节" else null
+                    6 -> if (day in 19..21) "端午" else null
+                    9 -> if (day in 25..27) "中秋" else null
+                    10 -> if (day in 1..8) "国庆" else null
+                    else -> null
+                }
+                if (name != null) {
+                    holidayNameMap[timestamp] = name
+                } else {
+                    holidayNameMap[timestamp] = "休"
+                }
+            }
+
+            Pair(holidayDateSet, holidayNameMap)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Pair(emptySet(), emptyMap())
+        }
+    }
+
+    fun selectTimeRange(timeRange: TimeRange) {
+        _selectedTimeRange.value = timeRange
+        loadTrendChartData()
+    }
+
+    fun selectChartDataType(dataType: ChartDataType) {
+        _selectedChartDataType.value = dataType
+        loadTrendChartData()
+    }
+
+    private fun loadTrendChartData() {
+        // 取消之前的计算任务
+        chartCalculationJob?.cancel()
+
+        chartCalculationJob = viewModelScope.launch {
+            try {
+                val timeRange = _selectedTimeRange.value
+                val dataType = _selectedChartDataType.value
+
+                val currentTime = TimeRepository.getCurrentTimeMillis()
+                val calendar = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
+                calendar.timeInMillis = currentTime
+
+                val startTime = when (timeRange) {
+                    TimeRange.WEEK -> {
+                        calendar.add(Calendar.WEEK_OF_YEAR, -1)
+                        calendar.timeInMillis
+                    }
+                    TimeRange.MONTH -> {
+                        calendar.add(Calendar.MONTH, -1)
+                        calendar.timeInMillis
+                    }
+                    TimeRange.YEAR -> {
+                        calendar.set(Calendar.DAY_OF_YEAR, 1)
+                        calendar.set(Calendar.HOUR_OF_DAY, 0)
+                        calendar.set(Calendar.MINUTE, 0)
+                        calendar.set(Calendar.SECOND, 0)
+                        calendar.set(Calendar.MILLISECOND, 0)
+                        calendar.timeInMillis
+                    }
+                }
+
+                val records = repository.getRecordsByDateRange(startTime, currentTime).first()
+
+                // 检查缓存
+                val cacheKey = TrendChartDataCache.generateKey(timeRange, dataType, records)
+                val cachedData = TrendChartDataCache.get(cacheKey)
+
+                // 如果有缓存，先显示缓存数据（秒开体验）
+                if (cachedData != null) {
+                    _trendChartData.value = cachedData
+                }
+
+                // 后台计算最新数据
+                val chartData = withContext(Dispatchers.Default) {
+                    // 数据采样优化：如果数据点过多，进行采样
+                    val sampledRecords = if (records.size > 100) {
+                        sampleRecords(records, 100)
+                    } else {
+                        records
+                    }
+
+                    when (dataType) {
+                        ChartDataType.RETURN_RATE -> calculateReturnRateData(sampledRecords)
+                        ChartDataType.ASSET_RATIO -> calculateAssetRatioData(sampledRecords)
+                        ChartDataType.ASSET_COMPARISON -> calculateAssetComparisonData(sampledRecords)
+                    }
+                }
+
+                // 缓存结果
+                TrendChartDataCache.put(cacheKey, chartData)
+
+                // 更新UI
+                _trendChartData.value = chartData
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /**
+     * 数据采样：减少数据点数量，提升渲染性能
+     * 参考：股票软件的K线采样算法
+     */
+    private fun sampleRecords(records: List<NetValueRecord>, targetSize: Int): List<NetValueRecord> {
+        if (records.size <= targetSize) return records
+
+        val step = records.size.toFloat() / targetSize
+        val result = ArrayList<NetValueRecord>(targetSize)
+
+        for (i in 0 until targetSize) {
+            val index = (i * step).toInt().coerceIn(0, records.size - 1)
+            result.add(records[index])
+        }
+
+        // 确保包含最后一个数据点
+        if (result.lastOrNull() != records.last()) {
+            result.add(records.last())
+        }
+
+        return result
+    }
+
+    private fun calculateReturnRateData(records: List<NetValueRecord>): TrendChartData {
+        if (records.isEmpty()) {
+            return TrendChartData(emptyList(), 0.0, 0.0, 0.0, 0.0, 0.0)
+        }
+
+        val sortedRecords = records.sortedBy { it.createdAt }
+        val basePrincipal = sortedRecords.first().principal
+
+        val dataPoints = sortedRecords.map { record ->
+            val returnRate = if (basePrincipal > 0) {
+                (record.totalAssets - basePrincipal) / basePrincipal * 100
+            } else 0.0
+
+            val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
+            cal.timeInMillis = record.createdAt
+
+            ChartDataPoint(
+                date = record.createdAt,
+                value = returnRate,
+                label = "${cal.get(Calendar.MONTH) + 1}/${cal.get(Calendar.DAY_OF_MONTH)}"
+            )
+        }
+
+        val values = dataPoints.map { it.value }
+        val minValue = values.minOrNull() ?: 0.0
+        val maxValue = values.maxOrNull() ?: 0.0
+        val currentValue = values.lastOrNull() ?: 0.0
+        val firstValue = values.firstOrNull() ?: 0.0
+        val changeValue = currentValue - firstValue
+        val changePercent = if (firstValue != 0.0) (changeValue / kotlin.math.abs(firstValue)) * 100 else 0.0
+
+        return TrendChartData(
+            dataPoints = dataPoints,
+            minValue = minValue,
+            maxValue = maxValue,
+            currentValue = currentValue,
+            changeValue = changeValue,
+            changePercent = changePercent
+        )
+    }
+
+    private fun calculateAssetRatioData(records: List<NetValueRecord>): TrendChartData {
+        if (records.isEmpty()) {
+            return TrendChartData(emptyList(), 0.0, 0.0, 0.0, 0.0, 0.0)
+        }
+
+        val sortedRecords = records.sortedBy { it.createdAt }
+        sortedRecords.last()
+
+        val dataPoints = sortedRecords.map { record ->
+            val totalValue = record.stockValue + record.bondValue + record.goldValue + record.cashValue
+            val stockRatio = if (totalValue > 0) record.stockValue / totalValue * 100 else 0.0
+
+            val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
+            cal.timeInMillis = record.createdAt
+
+            ChartDataPoint(
+                date = record.createdAt,
+                value = stockRatio,
+                label = "${cal.get(Calendar.MONTH) + 1}/${cal.get(Calendar.DAY_OF_MONTH)}"
+            )
+        }
+
+        val values = dataPoints.map { it.value }
+        val minValue = values.minOrNull() ?: 0.0
+        val maxValue = values.maxOrNull() ?: 0.0
+        val currentValue = values.lastOrNull() ?: 0.0
+        val firstValue = values.firstOrNull() ?: 0.0
+        val changeValue = currentValue - firstValue
+
+        return TrendChartData(
+            dataPoints = dataPoints,
+            minValue = minValue,
+            maxValue = maxValue,
+            currentValue = currentValue,
+            changeValue = changeValue,
+            changePercent = changeValue
+        )
+    }
+
+    private fun calculateAssetComparisonData(records: List<NetValueRecord>): TrendChartData {
+        if (records.isEmpty()) {
+            return TrendChartData(emptyList(), 0.0, 0.0, 0.0, 0.0, 0.0)
+        }
+
+        val sortedRecords = records.sortedBy { it.createdAt }
+
+        val dataPoints = sortedRecords.map { record ->
+            val totalValue = record.totalAssets
+
+            val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"), Locale.CHINA)
+            cal.timeInMillis = record.createdAt
+
+            ChartDataPoint(
+                date = record.createdAt,
+                value = totalValue,
+                label = "${cal.get(Calendar.MONTH) + 1}/${cal.get(Calendar.DAY_OF_MONTH)}"
+            )
+        }
+
+        val values = dataPoints.map { it.value }
+        val minValue = values.minOrNull() ?: 0.0
+        val maxValue = values.maxOrNull() ?: 0.0
+        val currentValue = values.lastOrNull() ?: 0.0
+        val firstValue = values.firstOrNull() ?: 0.0
+        val changeValue = currentValue - firstValue
+        val changePercent = if (firstValue != 0.0) (changeValue / firstValue) * 100 else 0.0
+
+        return TrendChartData(
+            dataPoints = dataPoints,
+            minValue = minValue,
+            maxValue = maxValue,
+            currentValue = currentValue,
+            changeValue = changeValue,
+            changePercent = changePercent
+        )
     }
 }
+
+

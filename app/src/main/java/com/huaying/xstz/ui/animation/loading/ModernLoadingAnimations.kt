@@ -274,8 +274,8 @@ fun PageTransitionLoading(
     AnimatedVisibility(
         visible = isLoading,
         modifier = modifier,
-        enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)),
-        exit = androidx.compose.animation.fadeOut(animationSpec = tween(200))
+        enter = fadeIn(animationSpec = tween(200)),
+        exit = fadeOut(animationSpec = tween(200))
     ) {
         Box(
             modifier = Modifier

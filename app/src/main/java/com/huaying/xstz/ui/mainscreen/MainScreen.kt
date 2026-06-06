@@ -86,7 +86,6 @@ fun MainScreen(
     var showEditCostDialog by remember { mutableStateOf(false) }
     var showEditQuantityDialog by remember { mutableStateOf(false) }
     var newCostPrice by remember { mutableStateOf(0.0) }
-    var newQuantity by remember { mutableStateOf(0.0) }
 
     // 使用 Scaffold 标准布局
     Scaffold(

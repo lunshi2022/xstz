@@ -171,8 +171,8 @@ private fun scaleModifier(visible: Boolean, durationMillis: Int): Modifier {
     val scale by animateFloatAsState(
         targetValue = if (visible) 1f else 0.8f,
         animationSpec = spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "scale"
     )
@@ -216,8 +216,8 @@ private fun mixedModifier(visible: Boolean, durationMillis: Int): Modifier {
     val scale by animateFloatAsState(
         targetValue = if (visible) 1f else 0.9f,
         animationSpec = spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "mixed_scale"
     )
@@ -330,8 +330,8 @@ fun ListEmptyStateAnimation(
         ) + scaleIn(
             initialScale = 0.9f,
             animationSpec = spring(
-                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
             )
         ),
         exit = fadeOut(

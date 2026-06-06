@@ -18,9 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.huaying.xstz.data.entity.OperationLog
 import com.huaying.xstz.data.entity.OperationType
 import com.huaying.xstz.data.entity.toDisplayName
@@ -353,48 +355,153 @@ private fun FilterDialog(
     onFilterSelected: (OperationType?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val operationTypes = OperationType.values()
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("筛选操作类型") },
-        text = {
-            Column {
+    // 按类别分组的操作类型
+    val groupedTypes = remember {
+        mapOf(
+            "基金操作" to listOf(
+                OperationType.ADD_FUND,
+                OperationType.DELETE_FUND,
+                OperationType.EDIT_FUND
+            ),
+            "交易操作" to listOf(
+                OperationType.BUY,
+                OperationType.SELL,
+                OperationType.REBALANCE,
+                OperationType.ADD_CASH,
+                OperationType.WITHDRAW_CASH,
+                OperationType.EDIT_HOLDING,
+                OperationType.EDIT_COST,
+                OperationType.EDIT_TARGET_RATIO,
+                OperationType.EDIT_ASSET_TYPE
+            ),
+            "数据操作" to listOf(
+                OperationType.CLEAR_DATA,
+                OperationType.EXPORT_DATA,
+                OperationType.IMPORT_DATA
+            ),
+            "设置操作" to listOf(
+                OperationType.SETTINGS_CHANGE
+            ),
+            "导航操作" to listOf(
+                OperationType.PAGE_VIEW,
+                OperationType.PAGE_SWITCH
+            ),
+            "交互操作" to listOf(
+                OperationType.BUTTON_CLICK,
+                OperationType.ITEM_CLICK,
+                OperationType.CHART_INTERACTION
+            ),
+            "系统操作" to listOf(
+                OperationType.SEARCH,
+                OperationType.FILTER,
+                OperationType.SORT,
+                OperationType.REFRESH,
+                OperationType.EXPAND_COLLAPSE
+            ),
+            "其他" to listOf(
+                OperationType.OTHER
+            )
+        )
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp)
+            ) {
+                // 标题
+                Text(
+                    text = "筛选操作类型",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // 全部选项
-                FilterOption(
+                FilterOptionCard(
                     text = "全部",
+                    icon = "🔍",
                     selected = currentFilter == null,
                     onClick = { onFilterSelected(null) }
                 )
-                
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                
-                // 各类型选项
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 分隔线
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 分组的操作类型列表
                 Column(
-                    modifier = Modifier.heightIn(max = 400.dp)
-                        .verticalScroll(rememberScrollState())
+                    modifier = Modifier
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    operationTypes.forEach { type ->
-                        FilterOption(
-                            text = "${type.toIcon()} ${type.toDisplayName()}",
-                            selected = currentFilter == type,
-                            onClick = { onFilterSelected(type) }
+                    groupedTypes.forEach { (groupName, types) ->
+                        // 类别标题
+                        Text(
+                            text = groupName,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                         )
+
+                        // 该类别下的操作类型
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            types.forEach { type ->
+                                FilterOptionCard(
+                                    text = type.toDisplayName(),
+                                    icon = type.toIcon(),
+                                    selected = currentFilter == type,
+                                    onClick = { onFilterSelected(type) }
+                                )
+                            }
+                        }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 关闭按钮
+                Surface(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "关闭",
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
-    )
+    }
 }
 
 @Composable
-private fun FilterOption(
+private fun FilterOptionCard(
     text: String,
+    icon: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -403,20 +510,43 @@ private fun FilterOption(
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
-            Color.Transparent
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         },
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 图标背景
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        } else {
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = icon,
+                    fontSize = 16.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
                 color = if (selected) {
                     MaterialTheme.colorScheme.onPrimaryContainer
                 } else {
@@ -424,13 +554,22 @@ private fun FilterOption(
                 },
                 modifier = Modifier.weight(1f)
             )
-            
+
             if (selected) {
-                Text(
-                    text = "✓",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✓",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -438,25 +577,48 @@ private fun FilterOption(
 
 private fun getOperationTypeColor(type: OperationType): Color {
     return when (type) {
-        OperationType.ADD_FUND -> Color(0xFF4CAF50)
+        // 基金操作 - 蓝色系
+        OperationType.ADD_FUND -> Color(0xFF1976D2)
         OperationType.DELETE_FUND -> Color(0xFFF44336)
         OperationType.EDIT_FUND -> Color(0xFF2196F3)
-        OperationType.BUY -> Color(0xFFFF9800)
-        OperationType.SELL -> Color(0xFF9C27B0)
-        OperationType.REBALANCE -> Color(0xFF00BCD4)
+
+        // 交易操作 - 橙/紫色系
+        OperationType.BUY -> Color(0xFF4CAF50)
+        OperationType.SELL -> Color(0xFFF44336)
+        OperationType.REBALANCE -> Color(0xFF9C27B0)
         OperationType.ADD_CASH -> Color(0xFF4CAF50)
         OperationType.WITHDRAW_CASH -> Color(0xFFF44336)
-        OperationType.EDIT_HOLDING -> Color(0xFF3F51B5)
+        OperationType.EDIT_HOLDING -> Color(0xFFFF9800)
         OperationType.EDIT_COST -> Color(0xFF795548)
         OperationType.EDIT_TARGET_RATIO -> Color(0xFFE91E63)
         OperationType.EDIT_ASSET_TYPE -> Color(0xFF009688)
+
+        // 数据操作 - 灰/青色系
         OperationType.CLEAR_DATA -> Color(0xFFF44336)
         OperationType.EXPORT_DATA -> Color(0xFF607D8B)
         OperationType.IMPORT_DATA -> Color(0xFF607D8B)
-        OperationType.SETTINGS_CHANGE -> Color(0xFF9E9E9E)
-        OperationType.VIEW_CHART -> Color(0xFF3F51B5)
-        OperationType.VIEW_DETAIL -> Color(0xFF2196F3)
-        OperationType.OTHER -> Color(0xFF757575)
+
+        // 设置操作 - 灰色系
+        OperationType.SETTINGS_CHANGE -> Color(0xFF757575)
+
+        // 导航操作 - 青/绿色系
+        OperationType.PAGE_VIEW -> Color(0xFF00BCD4)
+        OperationType.PAGE_SWITCH -> Color(0xFF009688)
+
+        // 交互操作 - 橙/蓝色系
+        OperationType.BUTTON_CLICK -> Color(0xFFFF5722)
+        OperationType.ITEM_CLICK -> Color(0xFF3F51B5)
+        OperationType.CHART_INTERACTION -> Color(0xFF673AB7)
+
+        // 系统操作 - 靛/蓝色系
+        OperationType.SEARCH -> Color(0xFF3F51B5)
+        OperationType.FILTER -> Color(0xFF2196F3)
+        OperationType.SORT -> Color(0xFF009688)
+        OperationType.REFRESH -> Color(0xFF00BCD4)
+        OperationType.EXPAND_COLLAPSE -> Color(0xFF795548)
+
+        // 其他
+        OperationType.OTHER -> Color(0xFF9E9E9E)
     }
 }
 

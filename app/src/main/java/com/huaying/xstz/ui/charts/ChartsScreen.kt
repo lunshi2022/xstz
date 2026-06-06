@@ -1,23 +1,16 @@
 package com.huaying.xstz.ui.charts
-
-import androidx.compose.foundation.layout.IntrinsicSize
 import android.graphics.drawable.GradientDrawable
-import android.graphics.Typeface
 import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.*
@@ -30,9 +23,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,22 +33,17 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.mikephil.charting.charts.LineChart
-import com.github.mikephil.charting.components.Legend
 import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.components.YAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet
-import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import com.github.mikephil.charting.formatter.ValueFormatter
 import com.github.mikephil.charting.listener.ChartTouchListener
 import com.github.mikephil.charting.listener.OnChartGestureListener
@@ -67,10 +52,8 @@ import com.huaying.xstz.data.repository.OperationLogger
 import com.huaying.xstz.data.model.DailyAssetData
 import org.threeten.bp.format.DateTimeFormatter
 import org.threeten.bp.LocalDate
-import org.threeten.bp.temporal.WeekFields
 import java.util.Locale
 import com.huaying.xstz.data.entity.AssetType
-import com.huaying.xstz.data.entity.toDisplayName
 import com.huaying.xstz.ui.theme.BrandBlue
 import com.huaying.xstz.ui.theme.DangerRed
 import com.huaying.xstz.ui.theme.SuccessGreen
@@ -78,14 +61,6 @@ import com.huaying.xstz.ui.theme.StockColor
 import com.huaying.xstz.ui.theme.BondColor
 import com.huaying.xstz.ui.theme.GoldColor
 import com.huaying.xstz.ui.theme.CashColor
-import com.huaying.xstz.ui.theme.DarkBackground
-import com.huaying.xstz.ui.theme.DarkSurface
-import com.huaying.xstz.ui.theme.DarkTextPrimary
-import com.huaying.xstz.ui.theme.DarkTextSecondary
-import com.huaying.xstz.ui.theme.LightBackground
-import com.huaying.xstz.ui.theme.LightSurface
-import com.huaying.xstz.ui.theme.LightTextPrimary
-import com.huaying.xstz.ui.theme.LightTextSecondary
 import com.huaying.xstz.ui.theme.getColorForAssetType
 import com.huaying.xstz.R
 
@@ -123,7 +98,7 @@ fun ChartsScreen(
                     .fillMaxWidth()
                     .background(backgroundColor)
                     .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = { /* 拦截点击事件 */ }
                     )
@@ -175,22 +150,11 @@ fun ChartsContent(
 ) {
     var clearTrigger by remember { mutableLongStateOf(0L) }
     var currentChartType by rememberSaveable { mutableStateOf(ChartType.RETURN) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.ui.platform.LocalContext.current
 
     // Clear highlight when time range changes
     LaunchedEffect(state.timeRange) {
         clearTrigger = System.currentTimeMillis()
-    }
-    
-    // 加载节假日数据
-    var holidays by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
-    var workdays by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
-    
-    LaunchedEffect(Unit) {
-        val year = LocalDate.now().year
-        // 使用内置节假日数据
-        holidays = com.huaying.xstz.data.repository.HolidayRepository.getBuiltinHolidaysForCalendar(year)
-        workdays = com.huaying.xstz.data.repository.HolidayRepository.getBuiltinWorkdaysForCalendar(year)
     }
 
     // Pre-sort and prepare all chart data once
@@ -254,9 +218,12 @@ fun ChartsContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
+                start = 16.dp,
                 top = 120.dp, // 从标题栏下方开始
+                end = 16.dp,
                 bottom = 140.dp // 确保最后一个项目可以滚动到导航栏上方完全可见
-            )
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 1. Time Range Selector
             item {
@@ -272,23 +239,21 @@ fun ChartsContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(vertical = 8.dp)
                         .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     ChartType.values().forEach { chartType ->
                         val isSelected = currentChartType == chartType
+                        val chartInteractionSource = remember { MutableInteractionSource() }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                                    RoundedCornerShape(6.dp)
-                                )
+                                .clip(RoundedCornerShape(6.dp))
                                 .clickable(
-                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                    indication = null
+                                    interactionSource = chartInteractionSource,
+                                    indication = LocalIndication.current
                                 ) {
                                     currentChartType = chartType
                                     clearTrigger = System.currentTimeMillis()
@@ -301,6 +266,9 @@ fun ChartsContent(
                                         }
                                     )
                                 }
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
+                                )
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -426,8 +394,8 @@ fun ChartsContent(
                                                 GradientDrawable(
                                                     GradientDrawable.Orientation.TOP_BOTTOM,
                                                     intArrayOf(
-                                                        androidx.compose.ui.graphics.Color(primaryColor).copy(alpha = 0.4f).toArgb(),
-                                                        androidx.compose.ui.graphics.Color(primaryColor).copy(alpha = 0.0f).toArgb()
+                                                        Color(primaryColor).copy(alpha = 0.4f).toArgb(),
+                                                        Color(primaryColor).copy(alpha = 0.0f).toArgb()
                                                     )
                                                 )
                                             }
@@ -616,8 +584,8 @@ fun ChartsContent(
                                                 GradientDrawable(
                                                     GradientDrawable.Orientation.TOP_BOTTOM,
                                                     intArrayOf(
-                                                        androidx.compose.ui.graphics.Color(primaryColor).copy(alpha = 0.4f).toArgb(),
-                                                        androidx.compose.ui.graphics.Color(primaryColor).copy(alpha = 0.0f).toArgb()
+                                                        Color(primaryColor).copy(alpha = 0.4f).toArgb(),
+                                                        Color(primaryColor).copy(alpha = 0.0f).toArgb()
                                                     )
                                                 )
                                             }
@@ -643,7 +611,7 @@ fun ChartsContent(
 
                                                 if (state.showPrincipal) {
                                                     val pDataSet = LineDataSet(preparedData.principalEntries, "投入本金").apply {
-                                                        color = androidx.compose.ui.graphics.Color(principalColor).copy(alpha = 0.8f).toArgb()
+                                                        color = Color(principalColor).copy(alpha = 0.8f).toArgb()
                                                         setDrawCircles(false)
                                                         lineWidth = 2.0f
                                                         setDrawValues(false)
@@ -689,14 +657,7 @@ fun ChartsContent(
                     }
                 }
 
-                // 3. Profit/Loss Calendar Heatmap
-                item {
-                    CalendarHeatmapSection(
-                        data = state.data,
-                        holidays = holidays,
-                        workdays = workdays
-                    )
-                }
+
             }
         }
     }
@@ -715,23 +676,21 @@ fun TimeRangeSelector(selected: TimeRange, onSelect: (TimeRange) -> Unit, darkTh
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(vertical = 8.dp)
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .padding(4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         TimeRange.values().forEach { range ->
             val isSelected = range == selected
+            val timeInteractionSource = remember { MutableInteractionSource() }
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                        RoundedCornerShape(6.dp)
-                    )
+                    .clip(RoundedCornerShape(6.dp))
                     .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null
+                        interactionSource = timeInteractionSource,
+                        indication = LocalIndication.current
                     ) {
                         onSelect(range)
                         OperationLogger.logFilter(
@@ -743,6 +702,9 @@ fun TimeRangeSelector(selected: TimeRange, onSelect: (TimeRange) -> Unit, darkTh
                             }
                         )
                     }
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
+                    )
                     .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -770,7 +732,7 @@ fun ChartSection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(vertical = 8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -935,8 +897,8 @@ fun ReturnTrendChart(
         GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(
-                androidx.compose.ui.graphics.Color(primaryColor).copy(alpha = 0.4f).toArgb(),
-                androidx.compose.ui.graphics.Color(primaryColor).copy(alpha = 0.0f).toArgb()
+                Color(primaryColor).copy(alpha = 0.4f).toArgb(),
+                Color(primaryColor).copy(alpha = 0.0f).toArgb()
             )
         )
     }
@@ -1061,7 +1023,7 @@ fun AssetAllocationChart(
                 Row(
                     modifier = Modifier
                         .clickable(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) { focusedAsset = if (isFocused) null else name }
                         .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1122,8 +1084,8 @@ fun AssetPerspectiveChart(
         GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(
-                androidx.compose.ui.graphics.Color(primaryColor).copy(alpha = 0.4f).toArgb(),
-                androidx.compose.ui.graphics.Color(primaryColor).copy(alpha = 0.0f).toArgb()
+                Color(primaryColor).copy(alpha = 0.4f).toArgb(),
+                Color(primaryColor).copy(alpha = 0.0f).toArgb()
             )
         )
     }
@@ -1149,7 +1111,7 @@ fun AssetPerspectiveChart(
 
         if (showPrincipal) {
             val pDataSet = LineDataSet(principalEntries, "投入本金").apply {
-                color = androidx.compose.ui.graphics.Color(principalColor).copy(alpha = 0.8f).toArgb()
+                color = Color(principalColor).copy(alpha = 0.8f).toArgb()
                 setDrawCircles(false)
                 lineWidth = 2.0f
                 setDrawValues(false)
@@ -1479,7 +1441,7 @@ fun CalendarHeader(
                         shape = RoundedCornerShape(12.dp)
                     )
                     .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = onToday
                     ),
@@ -1692,7 +1654,7 @@ fun CalendarDayCell(
                 shape = RoundedCornerShape(12.dp)
             )
             .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             )

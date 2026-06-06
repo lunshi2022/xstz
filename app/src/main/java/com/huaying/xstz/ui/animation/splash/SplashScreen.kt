@@ -128,8 +128,8 @@ private fun SplashLogo(
             else -> 1.1f
         },
         animationSpec = spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "logo_scale"
     )
@@ -284,8 +284,8 @@ private fun SplashContent(darkTheme: Boolean) {
     val titleOffset by animateFloatAsState(
         targetValue = 0f,
         animationSpec = spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "title_offset"
     )
@@ -300,8 +300,8 @@ private fun SplashContent(darkTheme: Boolean) {
     val subtitleOffset by animateFloatAsState(
         targetValue = 0f,
         animationSpec = spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "subtitle_offset"
     )

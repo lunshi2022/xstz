@@ -37,8 +37,8 @@ fun CustomBottomNavigationBar(
     darkTheme: Boolean
 ) {
     val navItems = listOf(
-        Triple("home", Icons.Default.Home, "首页"),
-        Triple("charts", Icons.Default.PieChart, "图表"),
+        Triple("home", Icons.Default.Home, "概览"),
+        Triple("charts", Icons.Default.PieChart, "分析"),
         Triple("rebalance", Icons.Default.CompareArrows, "再平衡"),
         Triple("settings", Icons.Default.Settings, "设置")
     )

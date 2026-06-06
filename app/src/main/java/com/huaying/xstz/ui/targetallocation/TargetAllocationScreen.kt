@@ -2,6 +2,8 @@ package com.huaying.xstz.ui.targetallocation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -89,29 +91,31 @@ fun TargetAllocationScreen(
     }
     
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         topBar = {
+            val backgroundColor = MaterialTheme.colorScheme.background
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(backgroundColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { /* 拦截点击事件 */ }
+                    )
                     .statusBarsPadding()
-                    .padding(horizontal = 4.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = {
-                    OperationLogger.logBack("目标占比配置")
-                    onBack()
-                }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "返回", tint = if (isDarkMode) DarkTextPrimary else LightTextPrimary)
-                }
                 Text(
                     "目标占比配置",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDarkMode) DarkTextPrimary else LightTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         },
-        containerColor = if (isDarkMode) DarkBackground else LightBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             // 底部状态栏和操作按钮
             Surface(
@@ -279,7 +283,7 @@ private fun FundRatioCard(
     val focusRequester = remember { FocusRequester() }
     
     // 只读状态下的颜色
-    val disabledColor = if (isDarkMode) DarkTextSecondary.copy(alpha = 0.5f) else LightTextSecondary.copy(alpha = 0.5f)
+    if (isDarkMode) DarkTextSecondary.copy(alpha = 0.5f) else LightTextSecondary.copy(alpha = 0.5f)
     
     Card(
         modifier = Modifier.fillMaxWidth(),

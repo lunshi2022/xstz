@@ -1,6 +1,7 @@
 package com.huaying.xstz.ui.addfund
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,6 +12,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -29,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -137,32 +140,29 @@ fun AddFundScreen(
     var isLoading by remember { mutableStateOf(false) }
     val fundCodeTextField = remember { FocusRequester() }
 
+    // 查询结果选择相关状态
+    var queryResult by remember { mutableStateOf<FundRepository.FundQueryResult?>(null) }
+
     // 记录页面查看
     LaunchedEffect(Unit) {
         OperationLogger.logPageView("添加基金")
     }
 
-    // 检查基金是否已存在
-    LaunchedEffect(fundCode.text) {
-        if (fundCode.text.length == 6) {
-            val fund = repository.getFundByCode(fundCode.text)
+    // 检查基金是否已存在（根据代码和名称共同判断，因为一个代码可能对应多个资产类型）
+    LaunchedEffect(fundCode.text, fundName) {
+        if (fundCode.text.length == 6 && fundName.isNotBlank()) {
+            // 根据代码和名称共同查询，确保同一个代码的不同资产类型被正确区分
+            val fund = repository.getFundByCodeAndName(fundCode.text, fundName)
             if (fund != null) {
                 existingFund = fund
-                fundName = fund.name
                 selectedType = fund.type
             } else {
-                // 如果是6位但没找到，清除之前关联的数据
+                // 如果根据代码+名称没找到，清除之前关联的数据
                 existingFund = null
-                fundName = ""
-                // 重置为默认值，避免上一个基金的数据干扰
-                selectedType = AssetType.STOCK
             }
         } else {
-            // 如果不是6位，清除所有关联数据
+            // 如果代码不是6位或名称为空，清除所有关联数据
             existingFund = null
-            fundName = ""
-            // 重置为默认值，避免上一个基金的数据干扰
-            selectedType = AssetType.STOCK
         }
     }
 
@@ -206,7 +206,7 @@ fun AddFundScreen(
                   (isShareModeValid || isMarketModeValid) &&
                   !showQuantityError
 
-    val isDarkMode = darkTheme
+    darkTheme
 
     Scaffold(
         topBar = {
@@ -300,16 +300,27 @@ fun AddFundScreen(
                                                 isLoading = true
                                                 OperationLogger.logButtonClick("获取基金信息", "添加基金")
                                                 try {
-                                                    val result = repository.fetchFundInfo(fundCode.text)
-                                                    if (result != null) {
-                                                        val (name, error) = result
-                                                        if (name != null) {
-                                                            fundName = name
-                                                        } else {
+                                                    val result = repository.fetchFundInfoWithOptions(fundCode.text)
+                                                    queryResult = result
+
+                                                    when {
+                                                        // 如果同时有股票和基金结果，不自动选择，让用户点击选择
+                                                        result.hasBothResults -> {
+                                                            // 清空基金名称，显示选择卡片
+                                                            fundName = ""
+                                                        }
+                                                        // 只有基金结果
+                                                        result.fundName != null -> {
+                                                            fundName = result.fundName
+                                                        }
+                                                        // 只有股票结果
+                                                        result.stockName != null -> {
+                                                            fundName = result.stockName
+                                                        }
+                                                        // 都失败了
+                                                        else -> {
                                                             fundName = "获取失败，请检查基金代码"
                                                         }
-                                                    } else {
-                                                        fundName = "获取失败，请检查基金代码"
                                                     }
                                                 } catch (e: Exception) {
                                                     fundName = "获取失败，请检查基金代码"
@@ -339,7 +350,7 @@ fun AddFundScreen(
                     )
                     
                     // 基金名称
-                    Column() {
+                    Column {
                         Text(
                             text = "基金名称",
                             style = MaterialTheme.typography.titleMedium,
@@ -349,14 +360,119 @@ fun AddFundScreen(
                             else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                         )
+                        // 根据状态显示不同的提示文字
+                        val displayText = when {
+                            fundName.isNotBlank() -> fundName
+                            queryResult?.hasAnyResult == true -> "请选择下方列表中的资产"
+                            else -> "请输入基金代码后点击获取"
+                        }
                         Text(
-                            text = fundName.ifEmpty { "请输入基金代码后点击获取" },
+                            text = displayText,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = if (fundName.isEmpty()) 
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                            else 
-                                MaterialTheme.colorScheme.onSurface
+                            color = when {
+                                fundName.isNotBlank() -> MaterialTheme.colorScheme.onSurface
+                                queryResult?.hasAnyResult == true -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            }
                         )
+                    }
+
+                    // 当同时存在股票和基金结果时，显示选择选项
+                    AnimatedVisibility(
+                        visible = queryResult?.hasBothResults == true && fundName.isEmpty(),
+                        enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                        exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "该代码对应多个资产，请选择：",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            // 场外基金选项
+                            queryResult?.fundName?.let { name ->
+                                val fundInteractionSource = remember { MutableInteractionSource() }
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(
+                                            interactionSource = fundInteractionSource,
+                                            indication = LocalIndication.current
+                                        ) {
+                                            fundName = name
+                                        },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "场外基金",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                            )
+                                            Text(
+                                                text = name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 股票选项
+                            queryResult?.stockName?.let { name ->
+                                val stockInteractionSource = remember { MutableInteractionSource() }
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(
+                                            interactionSource = stockInteractionSource,
+                                            indication = LocalIndication.current
+                                        ) {
+                                            fundName = name
+                                        },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "股票/场内基金",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                            )
+                                            Text(
+                                                text = name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -547,17 +663,22 @@ fun AddFundScreen(
                                 AssetType.CASH -> "现金"
                             }
                             val isSelected = selectedType == type
+                            val interactionSource = remember { MutableInteractionSource() }
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clickable(enabled = isFundNameValid) { selectedType = type }
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(
+                                        enabled = isFundNameValid,
+                                        interactionSource = interactionSource,
+                                        indication = LocalIndication.current
+                                    ) { selectedType = type }
                                     .background(
                                         color = when {
                                             !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                                             isSelected -> MaterialTheme.colorScheme.primaryContainer
                                             else -> MaterialTheme.colorScheme.surface
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
+                                        }
                                     )
                                     .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
@@ -614,17 +735,22 @@ fun AddFundScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             // 按份额
+                            val shareInteractionSource = remember { MutableInteractionSource() }
                             Box(
                                 modifier = Modifier
-                                    .clickable(enabled = isFundNameValid && !hasMarketInput) { inputMode = true }
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(
+                                        enabled = isFundNameValid && !hasMarketInput,
+                                        interactionSource = shareInteractionSource,
+                                        indication = LocalIndication.current
+                                    ) { inputMode = true }
                                     .background(
                                         color = when {
                                             !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                                             hasMarketInput -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                             inputMode -> MaterialTheme.colorScheme.primaryContainer
                                             else -> MaterialTheme.colorScheme.surface
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
+                                        }
                                     )
                                     .padding(horizontal = 16.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
@@ -642,17 +768,22 @@ fun AddFundScreen(
                                 )
                             }
                             // 按市值
+                            val marketInteractionSource = remember { MutableInteractionSource() }
                             Box(
                                 modifier = Modifier
-                                    .clickable(enabled = isFundNameValid && !hasShareInput) { inputMode = false }
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(
+                                        enabled = isFundNameValid && !hasShareInput,
+                                        interactionSource = marketInteractionSource,
+                                        indication = LocalIndication.current
+                                    ) { inputMode = false }
                                     .background(
                                         color = when {
                                             !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                                             hasShareInput -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                             !inputMode -> MaterialTheme.colorScheme.primaryContainer
                                             else -> MaterialTheme.colorScheme.surface
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
+                                        }
                                     )
                                     .padding(horizontal = 16.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center

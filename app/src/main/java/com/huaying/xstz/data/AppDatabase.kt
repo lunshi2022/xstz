@@ -27,7 +27,7 @@ import com.huaying.xstz.data.entity.Transaction
         TargetAllocation::class,
         OperationLog::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(EncryptedDoubleConverter::class, AssetTypeConverter::class)
@@ -64,7 +64,25 @@ abstract class AppDatabase : RoomDatabase() {
                 """)
             }
         }
-        
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 更新操作类型枚举值
+                // VIEW_DETAIL -> PAGE_VIEW
+                database.execSQL("""
+                    UPDATE operation_logs 
+                    SET operationType = 'PAGE_VIEW' 
+                    WHERE operationType = 'VIEW_DETAIL'
+                """)
+                // VIEW_CHART -> CHART_INTERACTION
+                database.execSQL("""
+                    UPDATE operation_logs 
+                    SET operationType = 'CHART_INTERACTION' 
+                    WHERE operationType = 'VIEW_CHART'
+                """)
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -72,7 +90,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "investment_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

@@ -105,8 +105,8 @@ private fun LogoAppearPhase(darkTheme: Boolean) {
     val scale by animateFloatAsState(
         targetValue = 1f,
         animationSpec = spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "logo_appear_scale"
     )

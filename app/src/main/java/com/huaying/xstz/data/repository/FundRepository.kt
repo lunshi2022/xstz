@@ -1,6 +1,4 @@
 package com.huaying.xstz.data.repository
-
-import android.util.Log
 import com.huaying.xstz.data.AppDatabase
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
@@ -18,10 +16,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.coroutineScope
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.IOException
 import org.threeten.bp.Instant
 import org.threeten.bp.ZoneId
-import org.threeten.bp.LocalDate
 
 class FundRepository(
     private val database: AppDatabase
@@ -36,6 +32,8 @@ class FundRepository(
     suspend fun getFundById(id: Long): Fund? = database.fundDao().getFundById(id)
     
     suspend fun getFundByCode(code: String): Fund? = database.fundDao().getFundByCode(code)
+    
+    suspend fun getFundByCodeAndName(code: String, name: String): Fund? = database.fundDao().getFundByCodeAndName(code, name)
     
     suspend fun insertFund(fund: Fund): Long = database.fundDao().insertFund(fund)
     
@@ -81,83 +79,130 @@ class FundRepository(
     suspend fun deleteAllTransactions() = database.transactionDao().deleteAllTransactions()
 
     
-    // 从网络获取基金名称
-    suspend fun fetchFundInfo(code: String): Pair<String?, String>? = withContext(Dispatchers.IO) {
+    // 基金查询结果数据类
+    data class FundQueryResult(
+        val stockName: String? = null,
+        val fundName: String? = null,
+        val stockError: String? = null,
+        val fundError: String? = null
+    ) {
+        val hasStockResult: Boolean get() = stockName != null
+        val hasFundResult: Boolean get() = fundName != null
+        val hasBothResults: Boolean get() = hasStockResult && hasFundResult
+        val hasAnyResult: Boolean get() = hasStockResult || hasFundResult
+    }
+
+    // 从网络获取基金名称（同时查询股票和基金接口）
+    suspend fun fetchFundInfoWithOptions(code: String): FundQueryResult = withContext(Dispatchers.IO) {
         try {
             // 移除空格
             val trimmedCode = code.trim()
-            
+
             // 检查代码长度
             if (trimmedCode.length != 6) {
-                return@withContext Pair(null, "代码长度错误")
-            }
-            
-            // 构建URL
-            val url = if (isStockCode(trimmedCode)) {
-                // 判断股票交易所
-                val exchange = when {
-                    trimmedCode.startsWith("6") || trimmedCode.startsWith("9") -> "sh"
-                    trimmedCode.startsWith("0") || trimmedCode.startsWith("3") || trimmedCode.startsWith("2") -> "sz"
-                    else -> return@withContext Pair(null, "无效的股票代码")
-                }
-                "https://qt.gtimg.cn/q=${exchange}${trimmedCode}"
-            } else if (is场内基金Code(trimmedCode)) {
-                // 场内基金使用股票接口
-                val exchange = when {
-                    trimmedCode.startsWith("5") -> "sh"
-                    trimmedCode.startsWith("1") -> "sz"
-                    else -> return@withContext Pair(null, "无效的场内基金代码")
-                }
-                "https://qt.gtimg.cn/q=${exchange}${trimmedCode}"
-            } else if (is场外基金Code(trimmedCode)) {
-                "https://qt.gtimg.cn/q=jj${trimmedCode}"
-            } else {
-                return@withContext Pair(null, "无效的代码")
+                return@withContext FundQueryResult(stockError = "代码长度错误", fundError = "代码长度错误")
             }
 
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-                .header("Referer", "https://gu.qq.com/")
-                .build()
-            val response = okHttpClient.newCall(request).execute()
+            // 对于可能是股票也可能是场外基金的代码（00开头），需要同时尝试两种接口
+            val isAmbiguousCode = trimmedCode.matches(Regex("^00[0-4]\\d{3}$"))
 
-            if (response.isSuccessful && response.body != null) {
-                val content = response.body!!.string()
+            // 存储两种接口的结果
+            var stockResult: Pair<String?, String>? = null
+            var fundResult: Pair<String?, String>? = null
 
-                // 检查是否为空响应
-                if (content.isEmpty() || content.trim().isEmpty()) {
-                    return@withContext Pair(null, "响应为空")
+            // 1. 尝试股票/场内基金接口
+            when {
+                isStockCode(trimmedCode) || isAmbiguousCode -> {
+                    val exchange = when {
+                        trimmedCode.startsWith("6") || trimmedCode.startsWith("9") -> "sh"
+                        trimmedCode.startsWith("0") || trimmedCode.startsWith("3") || trimmedCode.startsWith("2") -> "sz"
+                        else -> null
+                    }
+                    if (exchange != null) {
+                        stockResult = fetchFundInfoFromUrl("https://qt.gtimg.cn/q=${exchange}${trimmedCode}")
+                    }
                 }
-
-                // 解析返回数据: v_sz159509="纳指科技ETF~1.234~..." 或 v_jj110022="易方达消费行业股票~1.234~..."
-                // 找到第一个 " 和最后一个 " 之间的内容
-                val startIndex = content.indexOf('"')
-                val endIndex = content.lastIndexOf('"')
-
-                if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
-                    return@withContext Pair(null, "数据格式错误。响应: $content")
+                is场内基金Code(trimmedCode) -> {
+                    val exchange = when {
+                        trimmedCode.startsWith("5") -> "sh"
+                        trimmedCode.startsWith("1") -> "sz"
+                        else -> null
+                    }
+                    if (exchange != null) {
+                        stockResult = fetchFundInfoFromUrl("https://qt.gtimg.cn/q=${exchange}${trimmedCode}")
+                    }
                 }
-
-                val data = content.substring(startIndex + 1, endIndex)
-
-                if (data.isEmpty()) {
-                    return@withContext Pair(null, "数据为空。响应: $content")
-                }
-
-                val fields = data.split("~")
-
-                // 返回名称 (index 1)
-                if (fields.size > 2 && fields[1].isNotEmpty()) {
-                    Pair(fields[1], "")
-                } else {
-                    Pair(null, "字段数量: ${fields.size}。数据: $data")
-                }
-            } else {
-                Pair(null, "请求失败: ${response.code}")
             }
+
+            // 2. 尝试场外基金接口
+            if (is场外基金Code(trimmedCode) || isAmbiguousCode) {
+                fundResult = fetchFundInfoFromUrl("https://qt.gtimg.cn/q=jj${trimmedCode}")
+            }
+
+            FundQueryResult(
+                stockName = stockResult?.first,
+                fundName = fundResult?.first,
+                stockError = stockResult?.second,
+                fundError = fundResult?.second
+            )
         } catch (e: Exception) {
-            Pair(null, "异常: ${e.message}")
+            FundQueryResult(stockError = "异常: ${e.message}", fundError = "异常: ${e.message}")
+        }
+    }
+
+    // 从网络获取基金名称（兼容旧版本，优先返回基金结果）
+    suspend fun fetchFundInfo(code: String): Pair<String?, String> = withContext(Dispatchers.IO) {
+        val result = fetchFundInfoWithOptions(code)
+        when {
+            result.fundName != null -> Pair(result.fundName, "")
+            result.stockName != null -> Pair(result.stockName, "")
+            else -> Pair(null, result.fundError ?: result.stockError ?: "无法获取基金信息")
+        }
+    }
+    
+    // 从指定URL获取基金信息
+    private fun fetchFundInfoFromUrl(url: String): Pair<String?, String> {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            .header("Referer", "https://gu.qq.com/")
+            .build()
+        
+        val response = okHttpClient.newCall(request).execute()
+
+        if (response.isSuccessful && response.body != null) {
+            val content = response.body!!.string()
+
+            // 检查是否为空响应
+            if (content.isEmpty() || content.trim().isEmpty()) {
+                return Pair(null, "响应为空")
+            }
+
+            // 解析返回数据: v_sz159509="纳指科技ETF~1.234~..." 或 v_jj110022="易方达消费行业股票~1.234~..."
+            // 找到第一个 " 和最后一个 " 之间的内容
+            val startIndex = content.indexOf('"')
+            val endIndex = content.lastIndexOf('"')
+
+            if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
+                return Pair(null, "数据格式错误。响应: $content")
+            }
+
+            val data = content.substring(startIndex + 1, endIndex)
+
+            if (data.isEmpty()) {
+                return Pair(null, "数据为空。响应: $content")
+            }
+
+            val fields = data.split("~")
+
+            // 返回名称 (index 1)
+            return if (fields.size > 2 && fields[1].isNotEmpty()) {
+                Pair(fields[1], "")
+            } else {
+                Pair(null, "字段数量: ${fields.size}。数据: $data")
+            }
+        } else {
+            return Pair(null, "请求失败: ${response.code}")
         }
     }
     
@@ -171,7 +216,7 @@ class FundRepository(
         // 深圳创业板：300、301
         // 深圳B股：200
         // 北京证券交易所：43、83、87、88
-        return code.matches(Regex("^(60[0135]|688|900|00[0-4]|30[01]|200|43|8[378])\\d{3,4}$"))
+        return code.matches(Regex("^(60[0135]|688|900|00[0-4]|30[01]|200|43|8[378])\\d{3}$"))
     }
     
     // 判断是否为场内基金代码（根据中国市场规则）
@@ -328,6 +373,12 @@ class FundRepository(
         database.netValueRecordDao().insertRecord(record)
     
     suspend fun deleteAllNetValueRecords() = database.netValueRecordDao().deleteAllRecords()
+
+    fun getRecordsByDateRange(startTime: Long, endTime: Long): Flow<List<NetValueRecord>> =
+        database.netValueRecordDao().getRecordsByDateRange(startTime, endTime)
+
+    fun getRecordsSince(startTime: Long): Flow<List<NetValueRecord>> =
+        database.netValueRecordDao().getRecordsSince(startTime)
 
     /**
      * 获取处理后的每日资产数据流，用于图表显示。

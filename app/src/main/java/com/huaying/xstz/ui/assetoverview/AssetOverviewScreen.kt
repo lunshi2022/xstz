@@ -1,5 +1,4 @@
 package com.huaying.xstz.ui.assetoverview
-
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -8,11 +7,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,20 +18,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -49,18 +41,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -73,7 +60,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -81,27 +67,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
 import com.huaying.xstz.data.repository.OperationLogger
-import com.huaying.xstz.ui.component.StandardHorizontalPadding
-import com.huaying.xstz.ui.component.StandardVerticalPadding
 import com.huaying.xstz.ui.theme.BrandBlue
-import com.huaying.xstz.ui.theme.DarkBackground
-import com.huaying.xstz.ui.theme.DarkPriceBox
 import com.huaying.xstz.ui.theme.DarkSurface
-import com.huaying.xstz.ui.theme.DarkSurfaceSecondary
-import com.huaying.xstz.ui.theme.DarkTextPrimary
-import com.huaying.xstz.ui.theme.DarkTextSecondary
-import com.huaying.xstz.ui.theme.LightBackground
-import com.huaying.xstz.ui.theme.LightPriceBox
 import com.huaying.xstz.ui.theme.LightSurface
-import com.huaying.xstz.ui.theme.LightSurfaceSecondary
-import com.huaying.xstz.ui.theme.LightTextPrimary
-import com.huaying.xstz.ui.theme.LightTextSecondary
 import com.huaying.xstz.ui.theme.SuccessGreen
 import com.huaying.xstz.ui.theme.getColorForAssetType
 import kotlinx.coroutines.delay
@@ -117,12 +90,24 @@ fun AssetOverviewScreen(
     onNavigateToFundDetail: (Fund) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val scope = rememberCoroutineScope()
+    val selectedDate by viewModel.selectedDate.collectAsState()
+    rememberCoroutineScope()
     val isDarkMode = darkTheme
+    
+    var recordedDates by remember { mutableStateOf(emptySet<Long>()) }
+    var holidayDates by remember { mutableStateOf(emptySet<Long>()) }
+    var holidayNames by remember { mutableStateOf(emptyMap<Long, String>()) }
     
     // 记录页面查看
     LaunchedEffect(Unit) {
         OperationLogger.logPageView("资产概览")
+        
+        // 加载记录日期、节假日数据和当日数据
+        recordedDates = viewModel.getRecordedDates()
+        val (holidays, names) = viewModel.getHolidayDatesForCurrentYear()
+        holidayDates = holidays
+        holidayNames = names
+        viewModel.selectDate(selectedDate)
     }
     
     // 防抖处理，防止快速连续刷新
@@ -141,15 +126,9 @@ fun AssetOverviewScreen(
         derivedStateOf { (uiState as? AssetOverviewUiState.Success)?.summary?.isRefreshing == true }
     }
 
-    var showIndicator by remember { mutableStateOf(false) }
     val pullRefreshState = rememberPullRefreshState(isRefreshing, onRefresh)
 
     // 计算下拉距离
-    val pullDistance by remember {
-        derivedStateOf {
-            pullRefreshState.progress * 100f // 转换为0-100范围
-        }
-    }
 
     // 控制指示器显示：下拉过程中和刷新时都显示
     val isIndicatorVisible by remember {
@@ -446,7 +425,7 @@ fun SummaryCard(
                     .background(BrandBlue)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
+                        indication = LocalIndication.current,
                         enabled = !isRecording,
                         onClick = handleRecordClick
                     ),
@@ -797,7 +776,7 @@ fun FundListItem(
 ) {
     val currentValue = fund.holdingQuantity * fund.currentPrice
     val currentRatio = viewModel.getFundDisplayRatio(fund, totalAssets)
-    val (deviation, _) = viewModel.calculateDeviation(fund, totalAssets)
+    val (_, _) = viewModel.calculateDeviation(fund, totalAssets)
     val status = viewModel.getFundStatus(fund, totalAssets, rebalanceThreshold)
 
     val statusColor = when (status) {
@@ -933,7 +912,7 @@ fun FundListItem(
                 } else {
                     InfoItem(
                         label = "最新", 
-                        value = if (isPrivacyMode) "****" else "%.3f".format(java.util.Locale.CHINA, fund.currentPrice),
+                        value = if (isPrivacyMode) "****" else "%.3f".format(Locale.CHINA, fund.currentPrice),
                         alignment = Alignment.Start,
                         isDarkMode = isDarkMode
                     )

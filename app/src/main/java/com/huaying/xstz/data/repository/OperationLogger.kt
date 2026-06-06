@@ -45,12 +45,12 @@ object OperationLogger {
      */
     fun logPageView(pageName: String, extraInfo: String = "") {
         log(
-            type = OperationType.VIEW_DETAIL,
+            type = OperationType.PAGE_VIEW,
             title = "查看页面",
             description = if (extraInfo.isNotEmpty()) "$pageName - $extraInfo" else pageName
         )
     }
-    
+
     /**
      * 记录点击操作
      */
@@ -61,24 +61,24 @@ object OperationLogger {
             description = if (target.isNotEmpty()) "目标: $target" else ""
         )
     }
-    
+
     /**
      * 记录按钮点击
      */
     fun logButtonClick(buttonName: String, location: String = "") {
         log(
-            type = OperationType.OTHER,
+            type = OperationType.BUTTON_CLICK,
             title = "点击按钮: $buttonName",
             description = if (location.isNotEmpty()) "位置: $location" else ""
         )
     }
-    
+
     /**
      * 记录列表项点击
      */
     fun logItemClick(itemName: String, itemType: String = "") {
         log(
-            type = OperationType.VIEW_DETAIL,
+            type = OperationType.ITEM_CLICK,
             title = "查看: $itemName",
             description = if (itemType.isNotEmpty()) "类型: $itemType" else ""
         )
@@ -100,73 +100,73 @@ object OperationLogger {
      */
     fun logNavigationSwitch(from: String, to: String) {
         log(
-            type = OperationType.OTHER,
+            type = OperationType.PAGE_SWITCH,
             title = "切换页面",
             description = "$from → $to"
         )
     }
-    
+
     /**
      * 记录图表交互
      */
     fun logChartInteraction(action: String, chartType: String = "") {
         log(
-            type = OperationType.VIEW_CHART,
+            type = OperationType.CHART_INTERACTION,
             title = "图表操作: $action",
             description = if (chartType.isNotEmpty()) "图表类型: $chartType" else ""
         )
     }
-    
+
     /**
      * 记录搜索操作
      */
     fun logSearch(keyword: String, searchType: String = "") {
         log(
-            type = OperationType.OTHER,
+            type = OperationType.SEARCH,
             title = "搜索",
             description = if (searchType.isNotEmpty()) "类型: $searchType, 关键词: $keyword" else "关键词: $keyword"
         )
     }
-    
+
     /**
      * 记录刷新操作
      */
     fun logRefresh(refreshType: String = "") {
         log(
-            type = OperationType.OTHER,
+            type = OperationType.REFRESH,
             title = "刷新数据",
             description = if (refreshType.isNotEmpty()) "类型: $refreshType" else ""
         )
     }
-    
+
     /**
      * 记录展开/折叠操作
      */
     fun logExpandCollapse(itemName: String, isExpand: Boolean) {
         log(
-            type = OperationType.OTHER,
+            type = OperationType.EXPAND_COLLAPSE,
             title = if (isExpand) "展开" else "折叠",
             description = itemName
         )
     }
-    
+
     /**
      * 记录排序操作
      */
     fun logSort(sortBy: String, sortOrder: String = "") {
         log(
-            type = OperationType.OTHER,
+            type = OperationType.SORT,
             title = "排序",
             description = "按 $sortBy ${if (sortOrder.isNotEmpty()) "($sortOrder)" else ""}"
         )
     }
-    
+
     /**
      * 记录筛选操作
      */
     fun logFilter(filterType: String, filterValue: String = "") {
         log(
-            type = OperationType.OTHER,
+            type = OperationType.FILTER,
             title = "筛选",
             description = if (filterValue.isNotEmpty()) "$filterType: $filterValue" else filterType
         )

@@ -254,7 +254,7 @@ object NavigationAnimations {
     fun fadeIn(
         durationMillis: Int = AnimationConstants.Duration.PAGE_TRANSITION
     ): AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-        androidx.compose.animation.fadeIn(
+        fadeIn(
             animationSpec = tween(
                 durationMillis = durationMillis,
                 easing = AnimationConstants.Easing.Decelerate
@@ -268,7 +268,7 @@ object NavigationAnimations {
     fun fadeOut(
         durationMillis: Int = AnimationConstants.Duration.PAGE_TRANSITION
     ): AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        androidx.compose.animation.fadeOut(
+        fadeOut(
             animationSpec = tween(
                 durationMillis = durationMillis,
                 easing = AnimationConstants.Easing.Accelerate

@@ -9,6 +9,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +53,10 @@ import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.toDisplayName
 import com.huaying.xstz.data.model.DailyAssetData
 import com.huaying.xstz.data.repository.FundRepository
+import com.huaying.xstz.ui.assetoverview.AssetOverviewViewModel
+import com.huaying.xstz.ui.assetoverview.TrendChartSection
+import com.huaying.xstz.ui.assetoverview.CalendarView
+import com.huaying.xstz.ui.assetoverview.MergedDailyPnLCard
 import com.huaying.xstz.ui.theme.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -331,7 +336,7 @@ fun ChartSkeletonScreen(
     darkTheme: Boolean = false
 ) {
     val backgroundColor = if (darkTheme) DarkBackground else LightBackground
-    val surfaceColor = if (darkTheme) DarkSurface else LightSurface
+    if (darkTheme) DarkSurface else LightSurface
     val shimmerColor = if (darkTheme) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)
     
     // 骨架屏闪光动画
@@ -466,7 +471,8 @@ fun OptimizedChartsScreen(
     darkTheme: Boolean = false,
     viewModel: OptimizedChartsViewModel = viewModel(
         factory = OptimizedChartsViewModelFactory(repository, preferenceManager)
-    )
+    ),
+    assetOverviewViewModel: AssetOverviewViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val skeletonData by viewModel.skeletonData.collectAsState()
@@ -483,7 +489,8 @@ fun OptimizedChartsScreen(
             uiState = uiState,
             darkTheme = darkTheme,
             onTimeRangeSelected = viewModel::setTimeRange,
-            onTogglePrincipal = viewModel::togglePrincipal
+            onTogglePrincipal = viewModel::togglePrincipal,
+            assetOverviewViewModel = assetOverviewViewModel
         )
     }
 }
@@ -494,7 +501,8 @@ private fun ChartsContent(
     uiState: ChartsUiState,
     darkTheme: Boolean,
     onTimeRangeSelected: (TimeRange) -> Unit,
-    onTogglePrincipal: (Boolean) -> Unit
+    onTogglePrincipal: (Boolean) -> Unit,
+    assetOverviewViewModel: AssetOverviewViewModel
 ) {
     val isDarkMode = darkTheme
     
@@ -510,7 +518,7 @@ private fun ChartsContent(
                     .fillMaxWidth()
                     .background(backgroundColor)
                     .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = { }
                     )
@@ -545,7 +553,8 @@ private fun ChartsContent(
                     paddingValues = paddingValues,
                     onTimeRangeSelected = onTimeRangeSelected,
                     onTogglePrincipal = onTogglePrincipal,
-                    darkTheme = isDarkMode
+                    darkTheme = isDarkMode,
+                    assetOverviewViewModel = assetOverviewViewModel
                 )
             }
         }
@@ -558,26 +567,44 @@ private fun SuccessContent(
     paddingValues: PaddingValues,
     onTimeRangeSelected: (TimeRange) -> Unit,
     onTogglePrincipal: (Boolean) -> Unit,
-    darkTheme: Boolean
+    darkTheme: Boolean,
+    assetOverviewViewModel: AssetOverviewViewModel
 ) {
     var clearTrigger by remember { mutableLongStateOf(0L) }
     var currentChartType by rememberSaveable { mutableStateOf(ChartType.RETURN) }
-    
+
     // 使用预处理的数据
     val preparedData = state.preparedData
-    
+
     // 加载节假日数据
     var holidays by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
     var workdays by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
-    
+
+    // 日历和日收益相关数据
+    val selectedDate by assetOverviewViewModel.selectedDate.collectAsState()
+    val dailyPnLData by assetOverviewViewModel.dailyPnLData.collectAsState()
+
+    var recordedDates by remember { mutableStateOf(emptySet<Long>()) }
+    var holidayDates by remember { mutableStateOf(emptySet<Long>()) }
+    var holidayNames by remember { mutableStateOf(emptyMap<Long, String>()) }
+
     LaunchedEffect(state.timeRange) {
         clearTrigger = System.currentTimeMillis()
     }
-    
+
     LaunchedEffect(Unit) {
         val year = LocalDate.now().year
         holidays = com.huaying.xstz.data.repository.HolidayRepository.getBuiltinHolidaysForCalendar(year)
         workdays = com.huaying.xstz.data.repository.HolidayRepository.getBuiltinWorkdaysForCalendar(year)
+
+        // 加载日历相关数据
+        recordedDates = assetOverviewViewModel.getRecordedDates()
+        val (hDates, hNames) = assetOverviewViewModel.getHolidayDatesForCurrentYear()
+        holidayDates = hDates
+        holidayNames = hNames
+
+        // 初始化选中日期
+        assetOverviewViewModel.selectDate(selectedDate)
     }
     
     Box(
@@ -592,36 +619,19 @@ private fun SuccessContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                top = paddingValues.calculateTopPadding() + 16.dp,
+                start = 16.dp,
+                end = 16.dp,
+                top = 120.dp,
                 bottom = 140.dp
-            )
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 时间范围选择器
-            item {
-                TimeRangeSelector(
-                    selected = state.timeRange,
-                    onSelect = onTimeRangeSelected,
-                    darkTheme = darkTheme
-                )
-            }
-            
-            // 图表类型标签
-            item {
-                ChartTypeTabs(
-                    currentType = currentChartType,
-                    onTypeSelected = { 
-                        currentChartType = it
-                        clearTrigger = System.currentTimeMillis()
-                    }
-                )
-            }
-            
             if (preparedData == null || preparedData.sortedData.isEmpty()) {
                 item {
                     EmptyChartState()
                 }
             } else {
-                // 主图表区域
+                // 主图表区域（资产占比趋势等）
                 item {
                     OptimizedChartSection(
                         chartType = currentChartType,
@@ -629,62 +639,39 @@ private fun SuccessContent(
                         showPrincipal = state.showPrincipal,
                         onTogglePrincipal = onTogglePrincipal,
                         clearTrigger = clearTrigger,
-                        darkTheme = darkTheme
-                    )
-                }
-                
-                // 日历热力图
-                item {
-                    LazyCalendarHeatmap(
-                        data = state.data,
                         darkTheme = darkTheme,
-                        holidays = holidays,
-                        workdays = workdays
+                        timeRange = state.timeRange,
+                        onTimeRangeSelected = onTimeRangeSelected,
+                        onChartTypeSelected = { 
+                            currentChartType = it
+                            clearTrigger = System.currentTimeMillis()
+                        }
                     )
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun ChartTypeTabs(
-    currentType: ChartType,
-    onTypeSelected: (ChartType) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        ChartType.values().forEach { chartType ->
-            val isSelected = currentType == chartType
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                        RoundedCornerShape(6.dp)
-                    )
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null
-                    ) { onTypeSelected(chartType) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = when (chartType) {
-                        ChartType.RETURN -> "收益率"
-                        ChartType.ALLOCATION -> "资产占比"
-                        ChartType.PERSPECTIVE -> "资产对比"
+            // 日历视图
+            item {
+                CalendarView(
+                    selectedDate = selectedDate,
+                    onDateSelected = { date ->
+                        assetOverviewViewModel.selectDate(date)
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    recordedDates = recordedDates,
+                    holidayDates = holidayDates,
+                    holidayNames = holidayNames
+                )
+            }
+
+            // 日收益卡片（已合并基金明细）
+            item {
+                MergedDailyPnLCard(
+                    dailyPnLData = dailyPnLData,
+                    viewModel = assetOverviewViewModel,
+                    isPrivacyMode = false,
+                    onFundClick = { fundPnL ->
+                        // 可以在这里处理基金点击事件
+                    }
                 )
             }
         }
@@ -722,48 +709,51 @@ private fun OptimizedChartSection(
     showPrincipal: Boolean,
     onTogglePrincipal: (Boolean) -> Unit,
     clearTrigger: Long,
-    darkTheme: Boolean
+    darkTheme: Boolean,
+    timeRange: TimeRange,
+    onTimeRangeSelected: (TimeRange) -> Unit,
+    onChartTypeSelected: (ChartType) -> Unit
 ) {
     val title = when (chartType) {
         ChartType.RETURN -> "累计收益率趋势"
         ChartType.ALLOCATION -> "资产占比趋势"
         ChartType.PERSPECTIVE -> "总资产与投入本金对比趋势"
     }
-    
+
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                
-                if (chartType == ChartType.PERSPECTIVE) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("显示本金", style = MaterialTheme.typography.bodySmall)
-                        Switch(
-                            checked = showPrincipal,
-                            onCheckedChange = onTogglePrincipal,
-                            modifier = Modifier.scale(0.8f)
-                        )
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
+        Column(
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            // 时间范围选择器
+            OptimizedTimeRangeSelector(
+                selectedRange = timeRange,
+                onRangeSelected = onTimeRangeSelected,
+                isDarkMode = darkTheme
+            )
+
+            // 图表类型选择器
+            OptimizedChartTypeSelector(
+                selectedType = chartType,
+                onTypeSelected = onChartTypeSelected,
+                isDarkMode = darkTheme
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Box(modifier = Modifier.fillMaxWidth().height(320.dp)) {
                 when (chartType) {
                     ChartType.RETURN -> OptimizedReturnChart(
@@ -780,6 +770,98 @@ private fun OptimizedChartSection(
                         clearTrigger = clearTrigger
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptimizedTimeRangeSelector(
+    selectedRange: TimeRange,
+    onRangeSelected: (TimeRange) -> Unit,
+    isDarkMode: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        TimeRange.values().forEach { range ->
+            val isSelected = range == selectedRange
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        if (isSelected) BrandBlue else Color.Transparent
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onRangeSelected(range) }
+                    )
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = when (range) {
+                        TimeRange.WEEK -> "近1周"
+                        TimeRange.MONTH -> "近1月"
+                        TimeRange.YEAR -> "今年以来"
+                    },
+                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptimizedChartTypeSelector(
+    selectedType: ChartType,
+    onTypeSelected: (ChartType) -> Unit,
+    isDarkMode: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        ChartType.values().forEach { type ->
+            val isSelected = type == selectedType
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        if (isSelected) BrandBlue else Color.Transparent
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onTypeSelected(type) }
+                    )
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = when (type) {
+                        ChartType.RETURN -> "收益率"
+                        ChartType.ALLOCATION -> "资产占比"
+                        ChartType.PERSPECTIVE -> "资产对比"
+                    },
+                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                )
             }
         }
     }
@@ -1130,191 +1212,6 @@ private fun OptimizedBaseLineChart(
         }
     )
 }
-
-// 完整的日历热力图组件，支持月份切换和点击展开详情
-@Composable
-private fun LazyCalendarHeatmap(
-    data: List<DailyAssetData>,
-    darkTheme: Boolean,
-    holidays: Set<LocalDate> = emptySet(),
-    workdays: Set<LocalDate> = emptySet()
-) {
-    val calendarData = data.associateBy { it.date }
-    val today = LocalDate.now()
-    var currentMonth by remember { mutableStateOf(today) }
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
-    
-    val monthStart = currentMonth.withDayOfMonth(1)
-    val monthEnd = monthStart.plusMonths(1).minusDays(1)
-    // 一周从周一开始（ISO标准: 周一=1, 周日=7）
-    val startDate = monthStart.minusDays((monthStart.dayOfWeek.value - 1).toLong())
-    val endDate = monthEnd.plusDays((7 - monthEnd.dayOfWeek.value).toLong())
-    
-    // 计算月度统计
-    val monthData = data.filter { 
-        it.date.month == currentMonth.month && it.date.year == currentMonth.year 
-    }
-    val profitDays = monthData.count { it.returnRate > 0 }
-    val lossDays = monthData.count { it.returnRate < 0 }
-    val monthReturn = monthData.lastOrNull()?.returnRate?.minus(monthData.firstOrNull()?.returnRate ?: 0.0) ?: 0.0
-    
-    // 计算全局最大盈亏用于热力图颜色映射
-    val maxProfit = data.filter { it.returnRate > 0 }.maxOfOrNull { it.returnRate } ?: 0.0
-    val maxLoss = data.filter { it.returnRate < 0 }.minOfOrNull { it.returnRate } ?: 0.0
-    
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // 月份标题和导航
-            CalendarHeader(
-                currentMonth = currentMonth,
-                onPreviousMonth = { currentMonth = currentMonth.minusMonths(1) },
-                onNextMonth = { currentMonth = currentMonth.plusMonths(1) },
-                onToday = { currentMonth = LocalDate.now() },
-                profitDays = profitDays,
-                lossDays = lossDays,
-                monthReturn = monthReturn
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // 星期标题（周一到周日）
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                listOf("一", "二", "三", "四", "五", "六", "日").forEach { day ->
-                    Box(
-                        modifier = Modifier.size(48.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = day,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // 日历网格 with swipe gesture and animation
-            val swipeState = remember { androidx.compose.animation.core.Animatable(0f) }
-            val scope = rememberCoroutineScope()
-            var isAnimating by remember { mutableStateOf(false) }
-            
-            // 月份切换动画 - 使用简单的淡入淡出
-            val animatedAlpha by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = if (isAnimating) 0.5f else 1f,
-                animationSpec = tween(durationMillis = 200),
-                label = "calendarAlpha"
-            )
-            
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                scope.launch {
-                                    when {
-                                        swipeState.value > 80f -> {
-                                            isAnimating = true
-                                            currentMonth = currentMonth.minusMonths(1)
-                                            kotlinx.coroutines.delay(100)
-                                            isAnimating = false
-                                        }
-                                        swipeState.value < -80f -> {
-                                            isAnimating = true
-                                            currentMonth = currentMonth.plusMonths(1)
-                                            kotlinx.coroutines.delay(100)
-                                            isAnimating = false
-                                        }
-                                    }
-                                    swipeState.animateTo(0f, animationSpec = tween(300))
-                                }
-                            },
-                            onHorizontalDrag = { change, dragAmount ->
-                                change.consume()
-                                scope.launch {
-                                    val newValue = (swipeState.value + dragAmount).coerceIn(-200f, 200f)
-                                    swipeState.snapTo(newValue)
-                                }
-                            }
-                        )
-                    }
-                    .graphicsLayer {
-                        translationX = swipeState.value * 0.5f
-                        alpha = animatedAlpha
-                    }
-            ) {
-                Column {
-                    var current = startDate
-                    while (current.isBefore(endDate) || current.isEqual(endDate)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            repeat(7) {
-                                val date = current
-                                val dailyData = calendarData[date]
-                                val isSelected = selectedDate == date
-                                val isHoliday = holidays.contains(date)
-                                val isWorkday = workdays.contains(date)
-                                
-                                CalendarDayCell(
-                                    date = date,
-                                    currentMonth = currentMonth,
-                                    today = today,
-                                    dailyData = dailyData,
-                                    isSelected = isSelected,
-                                    isHoliday = isHoliday,
-                                    isWorkday = isWorkday,
-                                    maxProfit = maxProfit,
-                                    maxLoss = maxLoss,
-                                    onClick = { 
-                                        selectedDate = if (selectedDate == date) null else date
-                                    }
-                                )
-                                
-                                current = current.plusDays(1)
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
-            }
-            
-            // 选中日期详情面板
-            val selectedData = selectedDate?.let { calendarData[it] }
-            AnimatedVisibility(
-                visible = selectedData != null,
-                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
-            ) {
-                selectedData?.let { data ->
-                    DayDetailPanel(
-                        date = selectedDate!!,
-                        data = data
-                    )
-                }
-            }
-        }
-    }
-}
-
-// 以下函数复用 ChartsScreen.kt 中的定义：
-// CalendarHeader, CalendarDayCell, CalendarLegend, DayDetailPanel, 
-// AssetDetailRow, SummaryInfoItem, formatMoney
 
 // ViewModel工厂
 class OptimizedChartsViewModelFactory(

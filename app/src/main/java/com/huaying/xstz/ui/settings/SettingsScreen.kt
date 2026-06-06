@@ -64,9 +64,9 @@ fun SettingsScreen(
     onNavigateToOperationLog: () -> Unit = {},
     onCheckUpdate: () -> Unit = {}
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
+    LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    val isDarkMode = isSystemInDarkTheme()
+    isSystemInDarkTheme()
 
     // 记录页面查看
     LaunchedEffect(Unit) {
@@ -299,7 +299,7 @@ fun SettingsScreen(
             SettingsSection(title = "关于") {
                 SettingItem(
                     title = "版本",
-                    subtitle = "1.0.0",
+                    subtitle = "1.4.2",
                     onClick = {
                         OperationLogger.logButtonClick("版本信息", "设置-关于")
                         onNavigateToAbout()
@@ -346,7 +346,7 @@ fun DropdownSettingItem(
     val textSecondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
     
     // 用于移除点击反馈
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val interactionSource = remember { MutableInteractionSource() }
 
     Row(
         modifier = Modifier
@@ -370,7 +370,7 @@ fun DropdownSettingItem(
                     modifier = Modifier
                         .size(16.dp)
                         .clickable(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            interactionSource = remember { MutableInteractionSource() },
                             indication = null // 移除点击反馈
                         ) { onInfoClick() },
                     tint = MaterialTheme.colorScheme.primary
@@ -405,7 +405,7 @@ fun DropdownSettingItem(
             // 完全自定义的现代化下拉菜单 - 使用 Popup
             if (expanded) {
                 androidx.compose.ui.window.Popup(
-                    alignment = androidx.compose.ui.Alignment.TopEnd,
+                    alignment = Alignment.TopEnd,
                     offset = androidx.compose.ui.unit.IntOffset(0, 8),
                     onDismissRequest = { expanded = false },
                     properties = androidx.compose.ui.window.PopupProperties(focusable = true)
@@ -425,7 +425,7 @@ fun DropdownSettingItem(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
                                             .clickable(
-                                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                interactionSource = remember { MutableInteractionSource() },
                                                 indication = null // 移除点击反馈
                                             ) {
                                                 onOptionSelected(index)
@@ -490,7 +490,7 @@ fun SettingItem(
     onClick: () -> Unit,
     isDestructive: Boolean = false
 ) {
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -536,7 +536,7 @@ fun SettingItemWithSwitch(
     isChecked: Boolean = false,
     showArrow: Boolean = false
 ) {
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()

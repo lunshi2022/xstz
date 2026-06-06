@@ -80,8 +80,8 @@ fun Modifier.bouncyClickable(
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.92f else 1f,
         animationSpec = spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessHigh
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
         ),
         label = "bouncy_scale"
     )
@@ -163,8 +163,8 @@ fun AnimatedButton(
         animationSpec = when (animationType) {
             ButtonAnimationType.SCALE -> tween(100)
             ButtonAnimationType.BOUNCY -> spring(
-                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                stiffness = androidx.compose.animation.core.Spring.StiffnessHigh
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessHigh
             )
             ButtonAnimationType.SMOOTH -> tween(150, easing = AnimationConstants.Easing.Standard)
         },
@@ -218,8 +218,8 @@ fun AnimatedIconButton(
     val rotation by animateFloatAsState(
         targetValue = if (isClicked) rotationDegrees else 0f,
         animationSpec = spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "icon_rotation"
     )

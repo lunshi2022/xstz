@@ -3,6 +3,7 @@ package com.huaying.xstz.ui.fund
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -729,6 +730,7 @@ fun FundDetailScreen(
                     .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val deleteInteractionSource = remember { MutableInteractionSource() }
                 Box(
                     modifier = Modifier
                         .shadow(
@@ -740,8 +742,8 @@ fun FundDetailScreen(
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surface)
                         .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
+                            interactionSource = deleteInteractionSource,
+                            indication = LocalIndication.current,
                             onClick = {
                                 if (fund.type == AssetType.CASH) {
                                     OperationLogger.logButtonClick("清空现金", "基金详情")

@@ -54,26 +54,26 @@ object AnimationConstants {
     object SpringSpec {
         /** 标准弹性 */
         val Default = spring<Float>(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
         )
 
         /** 低弹性 - 更柔和 */
         val Gentle = spring<Float>(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessLow
         )
 
         /** 高弹性 - 更活泼 */
         val Bouncy = spring<Float>(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioHighBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessHigh
+            dampingRatio = Spring.DampingRatioHighBouncy,
+            stiffness = Spring.StiffnessHigh
         )
 
         /** 刚性弹性 - 快速稳定 */
         val Stiff = spring<Float>(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessHigh
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessHigh
         )
     }
 

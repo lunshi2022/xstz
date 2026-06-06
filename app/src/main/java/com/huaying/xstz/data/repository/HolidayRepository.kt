@@ -43,11 +43,7 @@ object HolidayRepository {
 
         // 2. 工作日判断是否为法定节假日
         val holidays = getHolidays(context, year)
-        if (holidays.contains(date)) {
-            return false
-        }
-
-        return true
+        return !holidays.contains(date)
     }
 
     /**
