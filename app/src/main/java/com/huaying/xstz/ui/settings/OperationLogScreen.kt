@@ -36,12 +36,12 @@ import java.util.*
 @Composable
 fun OperationLogScreen(
     operationLogRepository: OperationLogRepository,
+    operationLogs: List<OperationLog>,
+    logCount: Int,
     darkTheme: Boolean,
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val operationLogs by operationLogRepository.getAllOperationLogs().collectAsState(initial = emptyList())
-    val logCount by operationLogRepository.getOperationLogCount().collectAsState(initial = 0)
     
     var showFilterDialog by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf<OperationType?>(null) }
@@ -109,7 +109,7 @@ fun OperationLogScreen(
                     .fillMaxWidth()
                     .padding(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = MaterialTheme.colorScheme.surface
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -134,38 +134,45 @@ fun OperationLogScreen(
                 }
             }
             
-            if (filteredLogs.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "📝",
-                            fontSize = 48.sp
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "暂无操作记录",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (selectedFilter != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            TextButton(onClick = { selectedFilter = null }) {
-                                Text("清除筛选")
+            // 始终使用 LazyColumn，避免空/非空状态切换导致布局尺寸跳变
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (filteredLogs.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillParentMaxHeight(0.6f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    "📝",
+                                    fontSize = 48.sp
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "暂无操作记录",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (selectedFilter != null) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    TextButton(onClick = { selectedFilter = null }) {
+                                        Text("清除筛选")
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                } else {
                     groupedLogs.forEach { (groupTitle, logs) ->
                         item {
                             Text(
@@ -181,10 +188,10 @@ fun OperationLogScreen(
                             OperationLogItem(log = log)
                         }
                     }
-                    
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
+                }
+                
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }

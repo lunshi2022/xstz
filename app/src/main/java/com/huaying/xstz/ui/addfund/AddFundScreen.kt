@@ -3,6 +3,7 @@ package com.huaying.xstz.ui.addfund
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -10,6 +11,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.LocalIndication
@@ -25,41 +27,34 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.rememberCoroutineScope
-import com.huaying.xstz.data.AppDatabase
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.huaying.xstz.data.entity.AssetType
-import com.huaying.xstz.data.entity.Fund
 import com.huaying.xstz.data.entity.OperationType
-import com.huaying.xstz.data.entity.Transaction
-import com.huaying.xstz.data.entity.TransactionType
-import com.huaying.xstz.data.repository.FundRepository
 import com.huaying.xstz.data.repository.OperationLogRepository
 import com.huaying.xstz.data.repository.OperationLogger
-import com.huaying.xstz.data.repository.TimeRepository
+import com.huaying.xstz.ui.animation.AnimationConstants
+import com.huaying.xstz.ui.component.ThousandSeparatorTransformation
 import com.huaying.xstz.ui.theme.*
+import com.huaying.xstz.util.AppConstants
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -70,44 +65,6 @@ private fun formatNumber(value: String, decimalPlaces: Int = 2): String {
     return String.format(Locale.CHINA, "%,.${decimalPlaces}f", number)
 }
 
-// 解析千分符字符串为纯数字
-private fun parseNumber(formatted: String): String {
-    return formatted.replace(",", "")
-}
-
-// 格式化输入值用于显示（处理小数点输入中的状态）
-private fun formatForDisplay(value: String, isInteger: Boolean = false): String {
-    if (value.isEmpty()) return ""
-    
-    // 整数直接格式化
-    if (isInteger) {
-        val number = value.toLongOrNull() ?: return value
-        return String.format(Locale.CHINA, "%,d", number)
-    }
-    
-    // 如果正在输入小数点，保留原样
-    if (value.endsWith(".")) {
-        val intPart = value.substringBefore(".")
-        val intFormatted = intPart.toLongOrNull()?.let { 
-            String.format(Locale.CHINA, "%,d", it) 
-        } ?: intPart
-        return "$intFormatted."
-    }
-    
-    // 如果有小数点，格式化整数部分，保留小数部分原样
-    if (value.contains(".")) {
-        val intPart = value.substringBefore(".")
-        val decimalPart = value.substringAfter(".")
-        val intFormatted = intPart.toLongOrNull()?.let { 
-            String.format(Locale.CHINA, "%,d", it) 
-        } ?: intPart
-        return "$intFormatted.$decimalPart"
-    }
-    
-    // 纯整数，格式化为千分符（不添加小数位）
-    val number = value.toLongOrNull() ?: return value
-    return String.format(Locale.CHINA, "%,d", number)
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -115,90 +72,62 @@ fun AddFundScreen(
     darkTheme: Boolean = false,
     operationLogRepository: OperationLogRepository? = null,
     onBack: () -> Unit = {},
-    onFundAdded: () -> Unit = {}
+    onFundAdded: () -> Unit = {},
+    viewModel: AddFundViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
-    val database = AppDatabase.getDatabase(context)
-    val repository = remember { FundRepository(database) }
+    val uiState by viewModel.uiState.collectAsState()
+    val state = uiState as? AddFundUiState.Success
+
     val scope = rememberCoroutineScope()
 
-    var fundCode by remember { mutableStateOf(TextFieldValue("")) }
-    var fundName by rememberSaveable { mutableStateOf("") }
-    var selectedType by rememberSaveable { mutableStateOf(AssetType.STOCK) }
-    var existingFund by remember { mutableStateOf<Fund?>(null) }
-    var isOverwriteMode by remember { mutableStateOf(false) }
+    val fundCode = state?.fundCode ?: TextFieldValue("")
+    val fundName = state?.fundName ?: ""
+    val selectedType = state?.selectedType ?: AssetType.STOCK
+    val existingFund = state?.existingFund
+    val isOverwriteMode = state?.isOverwriteMode ?: false
+    val inputMode = state?.inputMode ?: true
+    val holdingQuantity = state?.holdingQuantity ?: TextFieldValue("")
+    val totalCost = state?.totalCost ?: TextFieldValue("")
+    val marketValue = state?.marketValue ?: TextFieldValue("")
+    val costPrice = state?.costPrice ?: TextFieldValue("")
+    val isLoading = state?.isLoading ?: false
+    val queryResult = state?.queryResult
 
-    var inputMode by rememberSaveable { mutableStateOf(true) } // true = 按份额, false = 按市值
-
-    // 按份额输入 - 存储原始值（无千分符）
-    var holdingQuantity by rememberSaveable { mutableStateOf("") }
-    var totalCost by rememberSaveable { mutableStateOf("") }
-    // 按市值输入 - 存储原始值（无千分符）
-    var marketValue by rememberSaveable { mutableStateOf("") }
-    var costPrice by rememberSaveable { mutableStateOf("") }
-
-    var isLoading by remember { mutableStateOf(false) }
     val fundCodeTextField = remember { FocusRequester() }
-
-    // 查询结果选择相关状态
-    var queryResult by remember { mutableStateOf<FundRepository.FundQueryResult?>(null) }
 
     // 记录页面查看
     LaunchedEffect(Unit) {
         OperationLogger.logPageView("添加基金")
     }
 
-    // 检查基金是否已存在（根据代码和名称共同判断，因为一个代码可能对应多个资产类型）
-    LaunchedEffect(fundCode.text, fundName) {
-        if (fundCode.text.length == 6 && fundName.isNotBlank()) {
-            // 根据代码和名称共同查询，确保同一个代码的不同资产类型被正确区分
-            val fund = repository.getFundByCodeAndName(fundCode.text, fundName)
-            if (fund != null) {
-                existingFund = fund
-                selectedType = fund.type
-            } else {
-                // 如果根据代码+名称没找到，清除之前关联的数据
-                existingFund = null
-            }
-        } else {
-            // 如果代码不是6位或名称为空，清除所有关联数据
-            existingFund = null
-        }
-    }
-
     // 判断当前输入方式是否有效
-    val hasShareInput = holdingQuantity.isNotBlank() || totalCost.isNotBlank()
-    val hasMarketInput = marketValue.isNotBlank() || costPrice.isNotBlank()
-    val isShareModeValid = holdingQuantity.isNotBlank() && totalCost.isNotBlank()
-    val isMarketModeValid = marketValue.isNotBlank() && costPrice.isNotBlank()
-    
-    // 确定当前使用的输入方式
+    val hasShareInput = holdingQuantity.text.isNotBlank() || totalCost.text.isNotBlank()
+    val hasMarketInput = marketValue.text.isNotBlank() || costPrice.text.isNotBlank()
+    val isShareModeValid = holdingQuantity.text.isNotBlank() && totalCost.text.isNotBlank()
+    val isMarketModeValid = marketValue.text.isNotBlank() && costPrice.text.isNotBlank()
+
     val currentInputMode = when {
-        hasShareInput && !hasMarketInput -> true  // 按份额
-        hasMarketInput && !hasShareInput -> false // 按市值
+        hasShareInput && !hasMarketInput -> true
+        hasMarketInput && !hasShareInput -> false
         isShareModeValid && !isMarketModeValid -> true
         isMarketModeValid && !isShareModeValid -> false
-        else -> inputMode // 默认使用切换选择
+        else -> inputMode
     }
-    
-    // 判断是否正确获取到基金名称
+
     val isFundNameValid = fundName.isNotBlank() &&
                           !fundName.contains("获取失败") &&
                           !fundName.contains("请检查")
 
-    // A股交易规则验证：股票、债券、商品ETF等场内交易品种，买入数量必须是100股的整数倍
-    val quantityLong = parseNumber(holdingQuantity).toLongOrNull() ?: 0L
-    val isQuantityMultipleOf100 = quantityLong > 0 && quantityLong % 100 == 0L
-    
-    // 检查是否需要应用交易规则
-    // 股票、债券、商品 都需要遵守一手100股的规则
-    val shouldEnforceLotRule = selectedType == AssetType.STOCK || 
-                             selectedType == AssetType.BOND || 
+    val quantityLong = holdingQuantity.text.toLongOrNull() ?: AppConstants.ZERO_LONG
+    val isQuantityMultipleOf100 = quantityLong > 0 && quantityLong % AppConstants.MIN_TRADE_UNIT == AppConstants.ZERO_LONG
+
+    val shouldEnforceLotRule = selectedType == AssetType.STOCK ||
+                             selectedType == AssetType.BOND ||
                              selectedType == AssetType.COMMODITY
-                             
-    val showQuantityError = currentInputMode && 
-                          shouldEnforceLotRule && 
-                          holdingQuantity.isNotEmpty() && 
+
+    val showQuantityError = currentInputMode &&
+                          shouldEnforceLotRule &&
+                          holdingQuantity.text.isNotEmpty() &&
                           !isQuantityMultipleOf100
 
     val isValid = fundCode.text.isNotBlank() &&
@@ -210,7 +139,6 @@ fun AddFundScreen(
 
     Scaffold(
         topBar = {
-            // 使用主题背景色半透明，与页面背景协调
             val backgroundColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
             Row(
                 modifier = Modifier
@@ -239,17 +167,17 @@ fun AddFundScreen(
             }
         },
         containerColor = MaterialTheme.colorScheme.background
-    ) { _ ->
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .imePadding()
+                .padding(paddingValues)
                 .padding(
                     start = 16.dp,
-                    top = 120.dp, // 从标题栏下方开始
                     end = 16.dp,
-                    bottom = 140.dp // 确保最后一个项目可以滚动到导航栏上方完全可见
+                    bottom = 16.dp
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -257,7 +185,7 @@ fun AddFundScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             ) {
                 Column(
@@ -269,18 +197,11 @@ fun AddFundScreen(
                     // 基金代码
                     OutlinedTextField(
                         value = fundCode,
-                        onValueChange = { 
-                            // 只允许输入数字，最多6位
-                            val filtered = it.text.filter { char -> char.isDigit() }
-                            if (filtered.length <= 6) {
-                                fundCode = TextFieldValue(
-                                    text = filtered,
-                                    selection = TextRange(filtered.length)
-                                )
-                            }
+                        onValueChange = {
+                            viewModel.setFundCode(it.text)
                         },
                         label = { Text("基金代码") },
-                        placeholder = { Text("请输入6位基金代码") },
+                        placeholder = { Text("请输入${AppConstants.FUND_CODE_LENGTH}位基金代码") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -288,7 +209,7 @@ fun AddFundScreen(
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         trailingIcon = {
-                            if (fundCode.text.length == 6) {
+                            if (fundCode.text.length == AppConstants.FUND_CODE_LENGTH) {
                                 Box(
                                     modifier = Modifier
                                         .padding(end = 8.dp)
@@ -297,36 +218,8 @@ fun AddFundScreen(
                                     Button(
                                         onClick = {
                                             scope.launch {
-                                                isLoading = true
                                                 OperationLogger.logButtonClick("获取基金信息", "添加基金")
-                                                try {
-                                                    val result = repository.fetchFundInfoWithOptions(fundCode.text)
-                                                    queryResult = result
-
-                                                    when {
-                                                        // 如果同时有股票和基金结果，不自动选择，让用户点击选择
-                                                        result.hasBothResults -> {
-                                                            // 清空基金名称，显示选择卡片
-                                                            fundName = ""
-                                                        }
-                                                        // 只有基金结果
-                                                        result.fundName != null -> {
-                                                            fundName = result.fundName
-                                                        }
-                                                        // 只有股票结果
-                                                        result.stockName != null -> {
-                                                            fundName = result.stockName
-                                                        }
-                                                        // 都失败了
-                                                        else -> {
-                                                            fundName = "获取失败，请检查基金代码"
-                                                        }
-                                                    }
-                                                } catch (e: Exception) {
-                                                    fundName = "获取失败，请检查基金代码"
-                                                } finally {
-                                                    isLoading = false
-                                                }
+                                                viewModel.fetchFundInfo()
                                             }
                                         },
                                         enabled = !isLoading,
@@ -348,7 +241,7 @@ fun AddFundScreen(
                             }
                         }
                     )
-                    
+
                     // 基金名称
                     Column {
                         Text(
@@ -360,7 +253,6 @@ fun AddFundScreen(
                             else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                         )
-                        // 根据状态显示不同的提示文字
                         val displayText = when {
                             fundName.isNotBlank() -> fundName
                             queryResult?.hasAnyResult == true -> "请选择下方列表中的资产"
@@ -377,11 +269,16 @@ fun AddFundScreen(
                         )
                     }
 
-                    // 当同时存在股票和基金结果时，显示选择选项
                     AnimatedVisibility(
                         visible = queryResult?.hasBothResults == true && fundName.isEmpty(),
-                        enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                        exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+                        enter = expandVertically(
+                            expandFrom = Alignment.Top,
+                            animationSpec = tween(AnimationConstants.Duration.NORMAL, easing = AnimationConstants.Easing.Decelerate)
+                        ) + fadeIn(tween(AnimationConstants.Duration.NORMAL)),
+                        exit = shrinkVertically(
+                            shrinkTowards = Alignment.Top,
+                            animationSpec = tween(AnimationConstants.Duration.FAST, easing = AnimationConstants.Easing.Accelerate)
+                        ) + fadeOut(tween(AnimationConstants.Duration.FAST))
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
@@ -393,7 +290,6 @@ fun AddFundScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            // 场外基金选项
                             queryResult?.fundName?.let { name ->
                                 val fundInteractionSource = remember { MutableInteractionSource() }
                                 Card(
@@ -403,7 +299,7 @@ fun AddFundScreen(
                                             interactionSource = fundInteractionSource,
                                             indication = LocalIndication.current
                                         ) {
-                                            fundName = name
+                                            viewModel.setFundName(name)
                                         },
                                     colors = CardDefaults.cardColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -433,7 +329,6 @@ fun AddFundScreen(
                                 }
                             }
 
-                            // 股票选项
                             queryResult?.stockName?.let { name ->
                                 val stockInteractionSource = remember { MutableInteractionSource() }
                                 Card(
@@ -443,7 +338,7 @@ fun AddFundScreen(
                                             interactionSource = stockInteractionSource,
                                             indication = LocalIndication.current
                                         ) {
-                                            fundName = name
+                                            viewModel.setFundName(name)
                                         },
                                     colors = CardDefaults.cardColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -476,13 +371,19 @@ fun AddFundScreen(
                     }
                 }
             }
-            
+
             // 已存在基金提示卡片
             AnimatedContent(
                 targetState = existingFund,
                 transitionSpec = {
-                    expandVertically(expandFrom = Alignment.Top) + fadeIn() togetherWith
-                    shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+                    expandVertically(
+                        expandFrom = Alignment.Top,
+                        animationSpec = tween(AnimationConstants.Duration.NORMAL, easing = AnimationConstants.Easing.Decelerate)
+                    ) + fadeIn(tween(AnimationConstants.Duration.NORMAL)) togetherWith
+                    shrinkVertically(
+                        shrinkTowards = Alignment.Top,
+                        animationSpec = tween(AnimationConstants.Duration.FAST, easing = AnimationConstants.Easing.Accelerate)
+                    ) + fadeOut(tween(AnimationConstants.Duration.FAST))
                 }
             ) { fund ->
                 if (fund != null) {
@@ -492,7 +393,6 @@ fun AddFundScreen(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer
                         )
                     ) {
-                        // ... card content ...
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -520,9 +420,9 @@ fun AddFundScreen(
                                     )
                                 }
                             }
-                            
+
                             HorizontalDivider(color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.2f))
-                            
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -541,8 +441,7 @@ fun AddFundScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
-                                
-                                // 计算持仓均价
+
                                 val avgCost = if (fund.holdingQuantity > 0) fund.totalCost / fund.holdingQuantity else 0.0
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
@@ -551,13 +450,13 @@ fun AddFundScreen(
                                         color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
                                     )
                                     Text(
-                                        text = formatNumber(avgCost.toString(), 3), // 显示3位小数
+                                        text = formatNumber(avgCost.toString(), 3),
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
-                                
+
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
                                         text = "持仓总额",
@@ -572,8 +471,7 @@ fun AddFundScreen(
                                     )
                                 }
                             }
-                            
-                            // 操作模式切换
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
@@ -598,7 +496,7 @@ fun AddFundScreen(
                                 )
                                 Switch(
                                     checked = isOverwriteMode,
-                                    onCheckedChange = { isOverwriteMode = it },
+                                    onCheckedChange = { viewModel.setOverwriteMode(it) },
                                     thumbContent = {
                                         if (isOverwriteMode) {
                                             Icon(
@@ -617,22 +515,21 @@ fun AddFundScreen(
                                     )
                                 )
                             }
-
                         }
                     }
                 } else {
                     Spacer(modifier = Modifier.fillMaxWidth().height(0.dp))
                 }
             }
-            
+
             // 资产类别
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isFundNameValid)
-                        MaterialTheme.colorScheme.surfaceVariant
+                        MaterialTheme.colorScheme.surface
                     else
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
                 )
             ) {
                 Column(
@@ -654,7 +551,6 @@ fun AddFundScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // 过滤掉现金选项，因为系统会自动维护默认现金账户
                         AssetType.values().filter { it != AssetType.CASH }.forEach { type ->
                             val typeName = when (type) {
                                 AssetType.STOCK -> "股票"
@@ -672,7 +568,7 @@ fun AddFundScreen(
                                         enabled = isFundNameValid,
                                         interactionSource = interactionSource,
                                         indication = LocalIndication.current
-                                    ) { selectedType = type }
+                                    ) { viewModel.setSelectedType(type) }
                                     .background(
                                         color = when {
                                             !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
@@ -695,19 +591,17 @@ fun AddFundScreen(
                             }
                         }
                     }
-
-
                 }
             }
-            
-            // 持仓信息输入（切换方式和输入框在一个大卡片中）
+
+            // 持仓信息输入
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isFundNameValid)
-                        MaterialTheme.colorScheme.surfaceVariant
+                        MaterialTheme.colorScheme.surface
                     else
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
                 )
             ) {
                 Column(
@@ -716,7 +610,6 @@ fun AddFundScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // 配置详情标题和切换方式
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -734,7 +627,6 @@ fun AddFundScreen(
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            // 按份额
                             val shareInteractionSource = remember { MutableInteractionSource() }
                             Box(
                                 modifier = Modifier
@@ -743,7 +635,7 @@ fun AddFundScreen(
                                         enabled = isFundNameValid && !hasMarketInput,
                                         interactionSource = shareInteractionSource,
                                         indication = LocalIndication.current
-                                    ) { inputMode = true }
+                                    ) { viewModel.setInputMode(true) }
                                     .background(
                                         color = when {
                                             !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
@@ -767,7 +659,6 @@ fun AddFundScreen(
                                     fontWeight = if (inputMode) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
-                            // 按市值
                             val marketInteractionSource = remember { MutableInteractionSource() }
                             Box(
                                 modifier = Modifier
@@ -776,7 +667,7 @@ fun AddFundScreen(
                                         enabled = isFundNameValid && !hasShareInput,
                                         interactionSource = marketInteractionSource,
                                         indication = LocalIndication.current
-                                    ) { inputMode = false }
+                                    ) { viewModel.setInputMode(false) }
                                     .background(
                                         color = when {
                                             !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
@@ -802,37 +693,31 @@ fun AddFundScreen(
                             }
                         }
                     }
-                    
-                    // 输入字段（带动画切换）
+
                     AnimatedContent(
                         targetState = currentInputMode,
                         transitionSpec = {
+                            val spec = tween<IntOffset>(AnimationConstants.Duration.NORMAL, easing = AnimationConstants.Easing.Standard)
                             if (targetState) {
-                                // 切换到按份额输入：从右向左滑入
-                                slideInHorizontally { width -> width } + fadeIn() togetherWith
-                                slideOutHorizontally { width -> -width } + fadeOut()
+                                slideInHorizontally(animationSpec = spec, initialOffsetX = { width -> width }) + fadeIn(tween(AnimationConstants.Duration.NORMAL)) togetherWith
+                                slideOutHorizontally(animationSpec = spec, targetOffsetX = { width -> -width }) + fadeOut(tween(AnimationConstants.Duration.NORMAL))
                             } else {
-                                // 切换到按市值输入：从左向右滑入
-                                slideInHorizontally { width -> -width } + fadeIn() togetherWith
-                                slideOutHorizontally { width -> width } + fadeOut()
+                                slideInHorizontally(animationSpec = spec, initialOffsetX = { width -> -width }) + fadeIn(tween(AnimationConstants.Duration.NORMAL)) togetherWith
+                                slideOutHorizontally(animationSpec = spec, targetOffsetX = { width -> width }) + fadeOut(tween(AnimationConstants.Duration.NORMAL))
                             }
                         }
                     ) { isShareMode ->
                         if (isShareMode) {
-                            // 按份额输入：持仓份额 + 总金额 - 水平布局
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    // 持仓份额 - 整数，千分符
                                     OutlinedTextField(
-                                        value = formatForDisplay(holdingQuantity, true),
+                                        value = holdingQuantity,
                                         onValueChange = {
                                             if (!isFundNameValid) return@OutlinedTextField
-                                            val parsed = parseNumber(it)
-                                            val filtered = parsed.filter { char -> char.isDigit() }
-                                            holdingQuantity = filtered
+                                            viewModel.setHoldingQuantity(it)
                                         },
                                         label = { Text(if (existingFund != null && !isOverwriteMode) "新增份额" else "持仓份额") },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -841,25 +726,14 @@ fun AddFundScreen(
                                         shape = RoundedCornerShape(12.dp),
                                         enabled = isFundNameValid,
                                         isError = showQuantityError,
-                                        supportingText = {}
+                                        supportingText = {},
+                                        visualTransformation = ThousandSeparatorTransformation()
                                     )
-                                    // 总金额 - 千分符，小数点后两位
                                     OutlinedTextField(
-                                        value = formatForDisplay(totalCost, false),
+                                        value = totalCost,
                                         onValueChange = { newValue ->
                                             if (!isFundNameValid) return@OutlinedTextField
-                                            val parsed = parseNumber(newValue)
-                                            // 允许空值
-                                            if (parsed.isEmpty()) {
-                                                totalCost = ""
-                                                return@OutlinedTextField
-                                            }
-                                            // 处理小数点输入
-                                            val filtered = parsed.filter { char -> char.isDigit() || char == '.' }
-                                            val dotCount = filtered.count { it == '.' }
-                                            if (dotCount <= 1) {
-                                                totalCost = filtered
-                                            }
+                                            viewModel.setTotalCost(newValue)
                                         },
                                         label = { Text(if (existingFund != null && !isOverwriteMode) "新增金额" else "总金额") },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -867,13 +741,13 @@ fun AddFundScreen(
                                         singleLine = true,
                                         shape = RoundedCornerShape(12.dp),
                                         enabled = isFundNameValid,
-                                        supportingText = {}
+                                        supportingText = {},
+                                        visualTransformation = ThousandSeparatorTransformation()
                                     )
                                 }
-                                // 提示文字显示在两个输入框下方
                                 if (showQuantityError) {
                                     Text(
-                                        text = "根据A股交易规则，买入数量必须是100股的整数倍",
+                                        text = "根据A股交易规则，买入数量必须是${AppConstants.MIN_TRADE_UNIT}股的整数倍",
                                         color = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                                         maxLines = Int.MAX_VALUE
@@ -881,28 +755,15 @@ fun AddFundScreen(
                                 }
                             }
                         } else {
-                            // 按市值输入：持仓市值 + 买入价格 - 水平布局
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                // 持仓市值 - 千分符，小数点后两位
                                 OutlinedTextField(
-                                    value = formatForDisplay(marketValue, false),
+                                    value = marketValue,
                                     onValueChange = { newValue ->
                                         if (!isFundNameValid) return@OutlinedTextField
-                                        val parsed = parseNumber(newValue)
-                                        // 允许空值
-                                        if (parsed.isEmpty()) {
-                                            marketValue = ""
-                                            return@OutlinedTextField
-                                        }
-                                        // 处理小数点输入
-                                        val filtered = parsed.filter { char -> char.isDigit() || char == '.' }
-                                        val dotCount = filtered.count { it == '.' }
-                                        if (dotCount <= 1) {
-                                            marketValue = filtered
-                                        }
+                                        viewModel.setMarketValue(newValue)
                                     },
                                     label = { Text(if (existingFund != null && !isOverwriteMode) "新增市值" else "持仓市值") },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -910,25 +771,14 @@ fun AddFundScreen(
                                     singleLine = true,
                                     shape = RoundedCornerShape(12.dp),
                                     enabled = isFundNameValid,
-                                    supportingText = {}
+                                    supportingText = {},
+                                    visualTransformation = ThousandSeparatorTransformation()
                                 )
-                                // 买入价格 - 千分符，小数点后两位
                                 OutlinedTextField(
-                                    value = formatForDisplay(costPrice, false),
+                                    value = costPrice,
                                     onValueChange = { newValue ->
                                         if (!isFundNameValid) return@OutlinedTextField
-                                        val parsed = parseNumber(newValue)
-                                        // 允许空值
-                                        if (parsed.isEmpty()) {
-                                            costPrice = ""
-                                            return@OutlinedTextField
-                                        }
-                                        // 处理小数点输入
-                                        val filtered = parsed.filter { char -> char.isDigit() || char == '.' }
-                                        val dotCount = filtered.count { it == '.' }
-                                        if (dotCount <= 1) {
-                                            costPrice = filtered
-                                        }
+                                        viewModel.setCostPrice(newValue)
                                     },
                                     label = { Text("买入价格") },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -936,119 +786,19 @@ fun AddFundScreen(
                                     singleLine = true,
                                     shape = RoundedCornerShape(12.dp),
                                     enabled = isFundNameValid,
-                                    supportingText = {}
+                                    supportingText = {},
+                                    visualTransformation = ThousandSeparatorTransformation()
                                 )
                             }
                         }
                     }
                 }
             }
-            
+
             // 底部按钮
             Button(
                 onClick = {
-                    scope.launch {
-                        val inputQuantity: Double
-                        val inputCost: Double
-                        val inputPrice: Double
-
-                        if (currentInputMode) {
-                             inputQuantity = parseNumber(holdingQuantity).toDoubleOrNull() ?: 0.0
-                             inputCost = parseNumber(totalCost).toDoubleOrNull() ?: 0.0
-                             inputPrice = if (inputQuantity > 0) inputCost / inputQuantity else 0.0
-                        } else {
-                             val value = parseNumber(marketValue).toDoubleOrNull() ?: 0.0
-                             inputPrice = parseNumber(costPrice).toDoubleOrNull() ?: 0.0
-                             inputQuantity = if (inputPrice > 0) value / inputPrice else 0.0
-                             inputCost = value
-                        }
-
-                        if (existingFund != null) {
-                            val fund = existingFund!!
-                            if (isOverwriteMode) {
-                                val updatedFund = fund.copy(
-                                    name = fundName,
-                                    type = selectedType,
-                                    holdingQuantity = inputQuantity,
-                                    totalCost = inputCost,
-                                    updatedAt = TimeRepository.getCurrentTimeMillis()
-                                )
-                                repository.updateFund(updatedFund)
-                                repository.insertTransaction(
-                                    Transaction(
-                                        fundId = fund.id,
-                                        fundCode = fund.code,
-                                        fundName = fund.name,
-                                        type = TransactionType.ADD_FUNDS,
-                                        amount = inputCost,
-                                        price = inputPrice,
-                                        quantity = inputQuantity,
-                                        remark = "覆盖持仓"
-                                    )
-                                )
-                            } else {
-                                val newQuantity = fund.holdingQuantity + inputQuantity
-                                val newCost = fund.totalCost + inputCost
-                                val updatedFund = fund.copy(
-                                    holdingQuantity = newQuantity,
-                                    totalCost = newCost,
-                                    updatedAt = TimeRepository.getCurrentTimeMillis()
-                                )
-                                repository.updateFund(updatedFund)
-                            repository.insertTransaction(
-                                Transaction(
-                                    fundId = fund.id,
-                                    fundCode = fund.code,
-                                    fundName = fund.name,
-                                    type = TransactionType.BUY,
-                                    amount = inputCost,
-                                    price = inputPrice,
-                                    quantity = inputQuantity,
-                                    remark = "添加基金-加仓"
-                                )
-                            )
-                            // 记录操作日志
-                            operationLogRepository?.logOperation(
-                                type = OperationType.ADD_FUND,
-                                title = "加仓基金",
-                                description = "代码: ${fund.code}, 份额: ${inputQuantity.toLong()}, 成本: ¥${String.format("%.2f", inputCost)}",
-                                targetId = fund.id,
-                                targetName = fund.name
-                            )
-                        }
-                    } else {
-                        val fund = Fund(
-                            code = fundCode.text,
-                            name = fundName,
-                            type = selectedType,
-                            holdingQuantity = inputQuantity,
-                            totalCost = inputCost,
-                            currentPrice = inputPrice
-                        )
-                        val id = repository.insertFund(fund)
-                        repository.insertTransaction(
-                            Transaction(
-                                fundId = id,
-                                fundCode = fund.code,
-                                fundName = fund.name,
-                                type = TransactionType.ADD_FUNDS,
-                                amount = inputCost,
-                                price = inputPrice,
-                                quantity = inputQuantity,
-                                remark = "初始持仓"
-                            )
-                        )
-                        // 记录操作日志
-                        operationLogRepository?.logOperation(
-                            type = OperationType.ADD_FUND,
-                            title = "添加基金",
-                            description = "代码: ${fund.code}, 份额: ${inputQuantity.toLong()}, 成本: ¥${String.format("%.2f", inputCost)}",
-                            targetId = id,
-                            targetName = fund.name
-                        )
-                    }
-                    onFundAdded()
-                    }
+                    viewModel.saveFund(operationLogRepository, onFundAdded)
                 },
                 enabled = isValid,
                 modifier = Modifier

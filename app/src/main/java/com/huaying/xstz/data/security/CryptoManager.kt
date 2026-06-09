@@ -21,9 +21,6 @@ class CryptoManager {
         load(null)
     }
 
-    private val encryptCipher = Cipher.getInstance(TRANSFORMATION)
-    private val decryptCipher = Cipher.getInstance(TRANSFORMATION)
-
     private fun getKey(): SecretKey {
         val existingKey = keyStore.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry
         return existingKey?.secretKey ?: createKey()
@@ -38,30 +35,38 @@ class CryptoManager {
                 )
                     .setBlockModes(BLOCK_MODE)
                     .setEncryptionPaddings(PADDING)
-                    .setUserAuthenticationRequired(false) // Set true for biometric prompt
+                    .setUserAuthenticationRequired(false)
                     .setRandomizedEncryptionRequired(true)
                     .build()
             )
         }.generateKey()
     }
 
+    private fun createEncryptCipher(): Cipher {
+        return Cipher.getInstance(TRANSFORMATION).apply {
+            init(Cipher.ENCRYPT_MODE, getKey())
+        }
+    }
+
+    private fun createDecryptCipher(iv: ByteArray): Cipher {
+        return Cipher.getInstance(TRANSFORMATION).apply {
+            init(Cipher.DECRYPT_MODE, getKey(), IvParameterSpec(iv))
+        }
+    }
+
     fun encrypt(bytes: ByteArray, outputStream: OutputStream): ByteArray {
-        val cipher = encryptCipher
-        cipher.init(Cipher.ENCRYPT_MODE, getKey())
+        val cipher = createEncryptCipher()
         val iv = cipher.iv
-        outputStream.write(iv) // Store IV at the beginning
+        outputStream.write(iv)
         val encryptedBytes = cipher.doFinal(bytes)
         outputStream.write(encryptedBytes)
         return encryptedBytes
     }
-    
-    // Helper for simple String encryption
+
     fun encrypt(plainText: String): String {
-        val cipher = encryptCipher
-        cipher.init(Cipher.ENCRYPT_MODE, getKey())
+        val cipher = createEncryptCipher()
         val iv = cipher.iv
         val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-        // Combine IV and encrypted data: IV(12 bytes) + EncryptedData
         val combined = ByteArray(iv.size + encryptedBytes.size)
         System.arraycopy(iv, 0, combined, 0, iv.size)
         System.arraycopy(encryptedBytes, 0, combined, iv.size, encryptedBytes.size)
@@ -70,37 +75,36 @@ class CryptoManager {
 
     fun decrypt(inputStream: InputStream): ByteArray {
         return inputStream.use { input ->
-            val iv = ByteArray(12) // GCM IV is usually 12 bytes
+            val iv = ByteArray(GCM_IV_LENGTH)
             input.read(iv)
-            val cipher = decryptCipher
-            cipher.init(Cipher.DECRYPT_MODE, getKey(), IvParameterSpec(iv))
+            val cipher = createDecryptCipher(iv)
             val encryptedBytes = input.readBytes()
             cipher.doFinal(encryptedBytes)
         }
     }
-    
-    // Helper for simple String decryption
+
     fun decrypt(encryptedBase64: String): String {
         if (encryptedBase64.isEmpty()) return ""
         try {
             val combined = Base64.decode(encryptedBase64, Base64.NO_WRAP)
-            
-            // Extract IV (first 12 bytes)
-            val iv = ByteArray(12)
-            System.arraycopy(combined, 0, iv, 0, 12)
-            
-            // Extract Encrypted Data
-            val encryptedSize = combined.size - 12
-            val encryptedBytes = ByteArray(encryptedSize)
-            System.arraycopy(combined, 12, encryptedBytes, 0, encryptedSize)
 
-            val cipher = decryptCipher
-            cipher.init(Cipher.DECRYPT_MODE, getKey(), IvParameterSpec(iv))
+            if (combined.size <= GCM_IV_LENGTH) {
+                return ""
+            }
+
+            val iv = ByteArray(GCM_IV_LENGTH)
+            System.arraycopy(combined, 0, iv, 0, GCM_IV_LENGTH)
+
+            val encryptedSize = combined.size - GCM_IV_LENGTH
+            val encryptedBytes = ByteArray(encryptedSize)
+            System.arraycopy(combined, GCM_IV_LENGTH, encryptedBytes, 0, encryptedSize)
+
+            val cipher = createDecryptCipher(iv)
             val decryptedBytes = cipher.doFinal(encryptedBytes)
             return String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
-            e.printStackTrace()
-            return "" // Or throw exception / return null
+            android.util.Log.e("CryptoManager", "decrypt failed", e)
+            return ""
         }
     }
 
@@ -110,5 +114,6 @@ class CryptoManager {
         private const val BLOCK_MODE = KeyProperties.BLOCK_MODE_GCM
         private const val PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
         private const val TRANSFORMATION = "$ALGORITHM/$BLOCK_MODE/$PADDING"
+        private const val GCM_IV_LENGTH = 12
     }
 }

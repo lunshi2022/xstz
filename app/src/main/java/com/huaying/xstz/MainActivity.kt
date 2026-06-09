@@ -6,7 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
 import androidx.activity.result.contract.ActivityResultContracts
+import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,6 +58,7 @@ import java.io.OutputStreamWriter
  * 主Activity
  * 仅负责Activity生命周期管理，其他职责委托给相应组件
  */
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // 记录启动开始时间
@@ -64,8 +67,23 @@ class MainActivity : ComponentActivity() {
         // 安装系统启动屏 - 必须在super.onCreate之前
         val splashScreen = installSplashScreen()
 
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // 根据系统当前主题判断是否深色模式
+        val isSystemDark = (resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        // 手动设置 edge-to-edge 和状态栏外观（不使用 enableEdgeToEdge，避免它覆盖我们的设置）
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            // 浅色模式：深色图标（isAppearanceLightStatusBars = true）
+            // 深色模式：浅色图标（isAppearanceLightStatusBars = false）
+            isAppearanceLightStatusBars = !isSystemDark
+            isAppearanceLightNavigationBars = !isSystemDark
+        }
 
         StartupTracer.markMilestone("activity_created")
 
@@ -116,15 +134,42 @@ fun InvestmentManagerApp() {
 
     val view = LocalView.current
     SideEffect {
-        val window = (view.context as android.app.Activity).window
-        val insetsController = WindowCompat.getInsetsController(window, view)
+        val activity = view.context as android.app.Activity
+        val window = activity.window
 
         // 配置状态栏 - 使用透明背景，与App背景融合
         window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
-        // 根据主题设置状态栏图标颜色
-        // 深色主题：白色图标；浅色主题：黑色图标
-        insetsController.isAppearanceLightStatusBars = !darkTheme
+        // 根据应用实际主题设置状态栏图标颜色
+        // 直接读取系统配置判断，不依赖 isSystemInDarkTheme()（某些场景不可靠）
+        val isSystemDark = (activity.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        // 最终是否使用深色图标：考虑用户手动选择和系统自动
+        val shouldUseDarkIcons = when (themeMode) {
+            0 -> !isSystemDark   // 自动模式：跟随系统
+            1 -> true            // 浅色模式：深色图标
+            2 -> false           // 深色模式：浅色图标
+            else -> !isSystemDark
+        }
+
+        Log.d("StatusBar", "themeMode=$themeMode, isSystemDark=$isSystemDark, shouldUseDarkIcons=$shouldUseDarkIcons")
+
+        // 新 API (API 23+)
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = shouldUseDarkIcons
+            isAppearanceLightNavigationBars = shouldUseDarkIcons
+        }
+
+        // 旧 API 兜底 (API 23-29)，直接操作 systemUiVisibility 标志位
+        @Suppress("DEPRECATION")
+        view.systemUiVisibility = if (shouldUseDarkIcons) {
+            view.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        } else {
+            view.systemUiVisibility and android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+        }
     }
 
     InvestmentManagerTheme(
@@ -247,7 +292,8 @@ fun MainContent(
                         toast.setGravity(android.view.Gravity.CENTER, 0, 0)
                         toast.show()
                     } catch (e: Exception) {
-                        val toast = android.widget.Toast.makeText(context, "导出失败: ${e.message}", android.widget.Toast.LENGTH_SHORT)
+                        android.util.Log.e("MainActivity", "export data failed", e)
+                        val toast = android.widget.Toast.makeText(context, "导出失败", android.widget.Toast.LENGTH_SHORT)
                         toast.setGravity(android.view.Gravity.CENTER, 0, 0)
                         toast.show()
                     }
@@ -265,7 +311,10 @@ fun MainContent(
                         context.contentResolver.openInputStream(uri)?.use { inputStream ->
                             InputStreamReader(inputStream).use { reader ->
                                 val content = reader.readText()
-                                val json = try { cryptoManager.decrypt(content) } catch (e: Exception) { content }
+                                val json = try { cryptoManager.decrypt(content) } catch (e: Exception) {
+                                    android.util.Log.w("MainActivity", "decrypt failed, fallback to plain text", e)
+                                    content
+                                }
                                 val finalJson = if (json.isEmpty() && content.isNotEmpty()) content else json
                                 val type = object : com.google.gson.reflect.TypeToken<ExportData>() {}.type
                                 val importData: ExportData = gson.fromJson(finalJson, type)
@@ -276,6 +325,7 @@ fun MainContent(
                             }
                         }
                     } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "import data failed", e)
                         val toast = android.widget.Toast.makeText(context, "导入失败: 确认文件正确", android.widget.Toast.LENGTH_SHORT)
                         toast.setGravity(android.view.Gravity.CENTER, 0, 0)
                         toast.show()

@@ -54,6 +54,7 @@ import org.threeten.bp.format.DateTimeFormatter
 import org.threeten.bp.LocalDate
 import java.util.Locale
 import com.huaying.xstz.data.entity.AssetType
+import com.huaying.xstz.ui.animation.AnimationConstants
 import com.huaying.xstz.ui.theme.BrandBlue
 import com.huaying.xstz.ui.theme.DangerRed
 import com.huaying.xstz.ui.theme.SuccessGreen
@@ -86,10 +87,6 @@ fun ChartsScreen(
     }
 
     Scaffold(
-        modifier = Modifier.graphicsLayer {
-            // 启用硬件加速，提升动画性能
-            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-        },
         topBar = {
             // 使用主题背景色半透明，与页面背景协调
             val backgroundColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
@@ -219,9 +216,9 @@ fun ChartsContent(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
-                top = 120.dp, // 从标题栏下方开始
+                top = paddingValues.calculateTopPadding() + 8.dp,
                 end = 16.dp,
-                bottom = 140.dp // 确保最后一个项目可以滚动到导航栏上方完全可见
+                bottom = paddingValues.calculateBottomPadding() + 8.dp
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -733,7 +730,7 @@ fun ChartSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -1283,8 +1280,7 @@ fun CalendarHeatmap(
         // 月份切换动画 - 使用简单的淡入淡出
         val animatedAlpha by androidx.compose.animation.core.animateFloatAsState(
             targetValue = if (isAnimating) 0.5f else 1f,
-            animationSpec = tween(durationMillis = 200),
-            label = "calendarAlpha"
+            animationSpec = tween(durationMillis = AnimationConstants.Duration.FAST),
         )
         
         Box(
@@ -1351,8 +1347,14 @@ fun CalendarHeatmap(
         // Detailed Information Panel
         AnimatedVisibility(
             visible = selectedData != null,
-            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+            enter = expandVertically(
+                expandFrom = Alignment.Top,
+                animationSpec = tween(AnimationConstants.Duration.NORMAL, easing = AnimationConstants.Easing.Decelerate)
+            ) + fadeIn(tween(AnimationConstants.Duration.NORMAL)),
+            exit = shrinkVertically(
+                shrinkTowards = Alignment.Top,
+                animationSpec = tween(AnimationConstants.Duration.FAST, easing = AnimationConstants.Easing.Accelerate)
+            ) + fadeOut(tween(AnimationConstants.Duration.FAST))
         ) {
             selectedData?.let { data ->
                 DayDetailPanel(
@@ -1414,13 +1416,13 @@ fun CalendarHeader(
             // 今天按钮 - 带有点击动画效果
             val todayButtonScale by androidx.compose.animation.core.animateFloatAsState(
                 targetValue = if (todayClickTrigger > 0 && System.currentTimeMillis() - todayClickTrigger < 150) 0.85f else 1f,
-                animationSpec = tween(durationMillis = 100),
-                label = "todayButtonScale"
+                animationSpec = tween(durationMillis = AnimationConstants.Duration.FAST),
+            label = "todayButtonScale"
             )
             val todayButtonAlpha by androidx.compose.animation.core.animateFloatAsState(
                 targetValue = if (todayClickTrigger > 0 && System.currentTimeMillis() - todayClickTrigger < 150) 0.7f else 1f,
-                animationSpec = tween(durationMillis = 100),
-                label = "todayButtonAlpha"
+                animationSpec = tween(durationMillis = AnimationConstants.Duration.FAST),
+            label = "todayButtonAlpha"
             )
             
             Box(
@@ -1769,7 +1771,7 @@ fun DayDetailPanel(
             .fillMaxWidth()
             .padding(top = 16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(16.dp)

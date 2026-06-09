@@ -1,4 +1,5 @@
 package com.huaying.xstz.data.repository
+import android.util.Log
 import com.huaying.xstz.data.AppDatabase
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
@@ -146,7 +147,8 @@ class FundRepository(
                 fundError = fundResult?.second
             )
         } catch (e: Exception) {
-            FundQueryResult(stockError = "异常: ${e.message}", fundError = "异常: ${e.message}")
+            Log.w("FundRepository", "fetchFundInfoWithOptions failed", e)
+            FundQueryResult(stockError = "查询失败", fundError = "查询失败")
         }
     }
 
@@ -323,7 +325,7 @@ class FundRepository(
                 null
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w("FundRepository", "fetchStockRealtimeData failed", e)
             null
         }
     }
@@ -347,17 +349,20 @@ class FundRepository(
                                     updatedAt = TimeRepository.getCurrentTimeMillis()
                                 )
                                 updateFund(updatedFund)
+                            } else {
+                                null
                             }
                         } catch (e: Exception) {
                             // 单个基金更新失败不影响其他基金
-                            e.printStackTrace()
+                            Log.w("FundRepository", "update fund ${fund.code} failed", e)
+                            null
                         }
                     }
                 }.awaitAll() // 等待所有并发请求完成
             }
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("FundRepository", "updateAllFundsRealtimeData failed", e)
             false
         }
     }
@@ -431,11 +436,11 @@ class FundRepository(
                 createdAt = TimeRepository.getCurrentTimeMillis()
             )
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("FundRepository", "calculateCurrentSnapshot failed", e)
             null
         }
     }
-    
+
     // ========== TargetAllocation 操作 ==========
     fun getTargetAllocation(): Flow<TargetAllocation?> = 
         database.targetAllocationDao().getTargetAllocation()

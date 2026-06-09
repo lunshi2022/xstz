@@ -167,29 +167,29 @@ fun TransactionHistoryScreen(
                 )
             }
 
-            if (filteredTransactions.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "暂无交易记录",
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                }
-            } else {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
+            // 始终使用相同布局结构，避免空/非空状态切换导致布局尺寸跳变
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                if (filteredTransactions.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "暂无交易记录",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                } else {
                     val sortedTransactions = filteredTransactions.sortedByDescending { it.createdAt }
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth(),
+                        modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -208,9 +208,7 @@ fun TransactionHistoryScreen(
 
 @Composable
 fun TransactionItemRow(transaction: Transaction, isCash: Boolean) {
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA)
-    dateFormat.timeZone = TimeZone.getTimeZone("GMT+8")
-    val dateStr = dateFormat.format(Date(transaction.createdAt))
+    val dateStr = com.huaying.xstz.ui.assetoverview.FormatUtils.formatShortDateTime(transaction.createdAt)
     
     // 判断是否为收入（卖出/转出是收入，显示绿色）
     val isIncome = transaction.type == TransactionType.SELL || transaction.type == TransactionType.WITHDRAW
@@ -248,7 +246,7 @@ fun TransactionItemRow(transaction: Transaction, isCash: Boolean) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "¥%,.2f".format(Locale.CHINA, displayAmount),
+                text = com.huaying.xstz.ui.assetoverview.FormatUtils.formatCurrency(displayAmount),
                 style = MaterialTheme.typography.titleMedium,
                 color = amountColor,
                 fontWeight = FontWeight.Bold
@@ -273,7 +271,7 @@ fun TransactionItemRow(transaction: Transaction, isCash: Boolean) {
                 transaction.type == TransactionType.SELL || 
                 transaction.type == TransactionType.REBALANCE) {
                 Text(
-                    text = "%.3f元 * %.0f份".format(Locale.CHINA, transaction.price, transaction.quantity),
+                    text = "${String.format(Locale.CHINA, "%.3f", transaction.price)}元 * ${String.format(Locale.CHINA, "%.0f", transaction.quantity)}份",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

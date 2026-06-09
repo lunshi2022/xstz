@@ -83,7 +83,7 @@ fun SimplePage(
                 windowInsets = TopAppBarDefaults.windowInsets
             )
         },
-        containerColor = if (isDarkMode) DarkBackground else LightBackground
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         content(paddingValues)
     }
@@ -121,7 +121,7 @@ fun SimplePageWithBottomBar(
             )
         },
         bottomBar = bottomBar,
-        containerColor = if (isDarkMode) DarkBackground else LightBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = contentWindowInsets
     ) { paddingValues ->
         content(paddingValues)

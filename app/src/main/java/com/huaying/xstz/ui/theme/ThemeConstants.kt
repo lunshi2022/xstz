@@ -11,10 +11,25 @@ object ThemeConstants {
     val SmallCornerRadius = RoundedCornerShape(8.dp)
     val TinyCornerRadius = RoundedCornerShape(4.dp)
     val ButtonCornerRadius = RoundedCornerShape(12.dp)
-    
+
     // 间距
     val CardPadding = 16.dp
     val CardVerticalPadding = 12.dp
     val ItemSpacing = 8.dp
     val SmallItemSpacing = 4.dp
+
+    // 格式化模板
+    object Format {
+        const val PERCENT_2F = "%.2f%%"
+        const val PERCENT_1F = "%.1f%%"
+        const val PERCENT_0F = "%.0f%%"
+        const val CURRENCY_2F = "¥%,.2f"
+        const val NUMBER_COMMA = "%,d"
+        const val NUMBER_COMMA_2F = "%,.2f"
+        const val NUMBER_COMMA_3F = "%,.3f"
+        const val NUMBER_0F = "%.0f"
+        const val NUMBER_1F = "%.1f"
+        const val NUMBER_2F = "%.2f"
+        const val NUMBER_3F = "%.3f"
+    }
 }

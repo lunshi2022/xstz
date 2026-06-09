@@ -40,6 +40,7 @@ import com.huaying.xstz.data.repository.OperationLogger
 import com.huaying.xstz.data.repository.TimeRepository
 import com.huaying.xstz.ui.theme.*
 import com.huaying.xstz.ui.theme.ThemeConstants
+import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.delay
@@ -68,6 +69,16 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     isSystemInDarkTheme()
 
+    // 动态读取版本号
+    val context = LocalContext.current
+    val appVersionName = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
+        } catch (e: Exception) {
+            "1.0.0"
+        }
+    }
+
     // 记录页面查看
     LaunchedEffect(Unit) {
         OperationLogger.logPageView("设置")
@@ -76,10 +87,6 @@ fun SettingsScreen(
     // themeMode and dynamicColorEnabled are now passed as parameters to avoid initial value flicker
 
     Scaffold(
-        modifier = Modifier.graphicsLayer {
-            // 启用硬件加速，提升动画性能
-            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-        },
         topBar = {
             // 使用主题背景色半透明，与页面背景协调
             val backgroundColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
@@ -105,18 +112,17 @@ fun SettingsScreen(
             }
         },
         containerColor = MaterialTheme.colorScheme.background
-    ) { _ ->
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                // 确保内容完全贴合底部
+                .padding(paddingValues)
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(
                     start = 0.dp,
-                    top = 120.dp, // 从标题栏下方开始
                     end = 0.dp,
-                    bottom = 140.dp // 确保最后一个项目可以滚动到导航栏上方完全可见
+                    bottom = 96.dp
                 )
         ) {
             // 常规
@@ -299,7 +305,7 @@ fun SettingsScreen(
             SettingsSection(title = "关于") {
                 SettingItem(
                     title = "版本",
-                    subtitle = "1.4.2",
+                    subtitle = appVersionName,
                     onClick = {
                         OperationLogger.logButtonClick("版本信息", "设置-关于")
                         onNavigateToAbout()
@@ -471,7 +477,7 @@ fun SettingsSection(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             shape = ThemeConstants.CardCornerRadius,
-            color = MaterialTheme.colorScheme.surfaceVariant
+            color = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier.padding(ThemeConstants.CardPadding, ThemeConstants.CardVerticalPadding),

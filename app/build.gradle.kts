@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.huaying.xstz"
         minSdk = 24
         targetSdk = 34
-        versionCode = 142
-        versionName = "1.4.2"
+        versionCode = 160
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -110,6 +111,12 @@ dependencies {
 
     // ThreeTenABP for java.time backport
     implementation("com.jakewharton.threetenabp:threetenabp:1.4.0")
+
+    // Hilt
+    val hiltVersion = "2.50"
+    implementation("com.google.dagger:hilt-android:$hiltVersion")
+    ksp("com.google.dagger:hilt-compiler:$hiltVersion")
+    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

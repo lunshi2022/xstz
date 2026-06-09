@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.huaying.xstz.R
 import com.huaying.xstz.ui.theme.ThemeConstants
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +40,16 @@ fun AboutScreen(
 ) {
     var showChangelog by remember { mutableStateOf(false) }
     darkTheme
+
+    // 动态读取版本号
+    val context = LocalContext.current
+    val appVersionName = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
+        } catch (e: Exception) {
+            "1.0.0"
+        }
+    }
 
     if (showChangelog) {
         Dialog(
@@ -79,11 +91,51 @@ fun AboutScreen(
                             .padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // v1.4.2 (最新版本)
+                        // v1.6.0 (最新版本)
+                        VersionItem(
+                            version = "v1.6.0",
+                            date = "2026-06-08",
+                            isLatest = true,
+                            changes = listOf(
+                                "新增统一动画系统，涵盖启动屏、加载、列表、导航、交互五大模块",
+                                "新增现代风格启动屏动画，支持品牌渐变与分阶段展示",
+                                "新增点状脉冲、波浪、骨架屏等多种加载动画组件",
+                                "新增列表项渐入位移动画与弹跳进入效果",
+                                "新增统一导航动画系统，Tab切换与子页面进入动画分层处理",
+                                "新增按钮按压缩放与涟漪扩散交互动画",
+                                "新增中国法定节假日数据仓库，支持网络获取与内置离线数据",
+                                "新增交易日判断逻辑，区分交易时段与休市状态",
+                                "新增日历节假日标识与日期详情面板",
+                                "新增启动性能追踪器 StartupTracer，监控各阶段耗时",
+                                "优化图表分析页面交互，支持手势滑动与触摸反馈",
+                                "优化资产概览页面下拉刷新与盈亏卡片展示"
+                            )
+                        )
+
+                        // v1.5.0
+                        VersionItem(
+                            version = "v1.5.0",
+                            date = "2026-06-07",
+                            isLatest = false,
+                            changes = listOf(
+                                "重构导航栏为浮动胶囊造型，新增渐变边框与选中态高亮",
+                                "导航图标改为 Filled/Outlined 双图标切换",
+                                "引入 Hilt 依赖注入框架，统一 ViewModel 创建方式",
+                                "新增 AddFundViewModel、RebalanceViewModel、TargetAllocationViewModel",
+                                "修复 AES-GCM 加密 IV 复用安全漏洞",
+                                "移除数据库 fallbackToDestructiveMigration 防止数据丢失",
+                                "提取全局魔法数字为 AppConstants 常量",
+                                "统一日期/货币格式化为 FormatUtils 和 ThemeConstants.Format",
+                                "替换 e.printStackTrace() 为 Log.x() 规范异常日志",
+                                "修复 Hilt 运行时闪退（MainActivity 缺少 @AndroidEntryPoint）"
+                            )
+                        )
+
+                        // v1.4.2
                         VersionItem(
                             version = "v1.4.2",
                             date = "2026-04-22",
-                            isLatest = true,
+                            isLatest = false,
                             changes = listOf("优化资产再平衡功能")
                         )
 
@@ -213,10 +265,10 @@ fun AboutScreen(
             ) {
                 Spacer(modifier = Modifier.height(40.dp))
 
-                // App Icon - 保持原有图标
+                // App Icon
                 Surface(
                     modifier = Modifier
-                        .size(96.dp)
+                        .size(80.dp)
                         .clip(ThemeConstants.DialogCornerRadius),
                     color = Color.Transparent,
                     tonalElevation = 0.dp
@@ -224,7 +276,8 @@ fun AboutScreen(
                     Image(
                         painter = painterResource(id = R.drawable.ic_logo),
                         contentDescription = "App Icon",
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
                     )
                 }
 
@@ -245,7 +298,7 @@ fun AboutScreen(
                     shape = RoundedCornerShape(100.dp)
                 ) {
                     Text(
-                        text = "v1.4.2",
+                        text = "v$appVersionName",
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
@@ -265,7 +318,7 @@ fun AboutScreen(
                             ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                         ),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = MaterialTheme.colorScheme.surface
                     ),
                     shape = ThemeConstants.CardCornerRadius,
                     border = BorderStroke(
@@ -335,18 +388,7 @@ fun AboutScreen(
                 )
             }
 
-            // Home Indicator
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 8.dp)
-                    .width(128.dp)
-                    .height(4.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                        shape = ThemeConstants.TinyCornerRadius
-                    )
-            )
+
         }
     }
 }

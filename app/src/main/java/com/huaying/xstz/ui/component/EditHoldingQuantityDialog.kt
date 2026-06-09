@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
+import com.huaying.xstz.ui.animation.AnimationConstants
 import com.huaying.xstz.ui.animation.interaction.clickableScale
 import com.huaying.xstz.ui.theme.BrandBlue
 import com.huaying.xstz.ui.theme.DarkPriceBox
@@ -66,7 +67,11 @@ fun EditHoldingQuantityDialog(
                     errorMessage = null
                 }
             } else {
-                errorMessage = null
+                if (isExceedingBalance) {
+                    errorMessage = "取出金额不能超过当前余额 (¥%,.2f)".format(Locale.CHINA, currentQuantity)
+                } else {
+                    errorMessage = null
+                }
             }
         } else {
             errorMessage = null
@@ -78,14 +83,14 @@ fun EditHoldingQuantityDialog(
 
     AnimatedVisibility(
         visible = true,
-        enter = fadeIn(animationSpec = tween(200)) + scaleIn(
+        enter = fadeIn(animationSpec = tween(AnimationConstants.Duration.FAST)) + scaleIn(
             initialScale = 0.8f,
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
                 stiffness = Spring.StiffnessMedium
             )
         ),
-        exit = fadeOut(animationSpec = tween(150)) + scaleOut(targetScale = 0.9f)
+        exit = fadeOut(animationSpec = tween(AnimationConstants.Duration.FAST)) + scaleOut(targetScale = 0.9f)
     ) {
         Dialog(onDismissRequest = onDismiss) {
             Surface(
@@ -144,7 +149,8 @@ fun EditHoldingQuantityDialog(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = ThousandSeparatorTransformation()
                     )
 
                     if (showPriceInput) {
@@ -157,7 +163,8 @@ fun EditHoldingQuantityDialog(
                             isError = isPriceError,
                             prefix = { Text("¥") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            visualTransformation = ThousandSeparatorTransformation()
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -195,17 +202,17 @@ fun EditHoldingQuantityDialog(
                                 .clickableScale {
                                     val quantityVal = inputQuantity.toDoubleOrNull()
                                     val priceVal = if (showPriceInput) inputPrice.toDoubleOrNull() else null
-                                    if (quantityVal != null) {
+                                    if (quantityVal != null && !isInputError) {
                                         onConfirm(quantityVal, priceVal)
                                     }
                                 },
                             shape = RoundedCornerShape(12.dp),
-                            color = BrandBlue
+                            color = if (isInputError) BrandBlue.copy(alpha = 0.4f) else BrandBlue
                         ) {
                             Text(
                                 "确定",
                                 modifier = Modifier.padding(vertical = 14.dp),
-                                color = Color.White,
+                                color = if (isInputError) Color.White.copy(alpha = 0.6f) else Color.White,
                                 style = MaterialTheme.typography.labelLarge,
                                 textAlign = TextAlign.Center
                             )

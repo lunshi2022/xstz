@@ -1,5 +1,6 @@
 package com.huaying.xstz.data.repository
 
+import android.util.Log
 import com.huaying.xstz.data.entity.OperationLog
 import com.huaying.xstz.data.entity.OperationType
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +36,7 @@ object OperationLogger {
                 repo.logOperation(type, title, description, targetId, targetName)
             } catch (e: Exception) {
                 // 记录失败不影响主流程
-                e.printStackTrace()
+                Log.w("OperationLogger", "logOperation failed", e)
             }
         }
     }

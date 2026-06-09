@@ -1,5 +1,6 @@
 package com.huaying.xstz.data.converter
 
+import android.util.Log
 import androidx.room.TypeConverter
 import com.huaying.xstz.data.security.CryptoManager
 import java.util.Locale
@@ -21,7 +22,7 @@ class EncryptedDoubleConverter {
             val stringValue = String.format(Locale.US, "%.10f", value)
             cryptoManager.encrypt(stringValue)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("EncryptedDoubleConverter", "encrypt failed", e)
             null
         }
     }
@@ -40,13 +41,13 @@ class EncryptedDoubleConverter {
             val decryptedString = cryptoManager.decrypt(encryptedValue)
             decryptedString.toDoubleOrNull()
         } catch (e: Exception) {
-            e.printStackTrace()
-            0.0 // Fail safe default
+            Log.e("EncryptedDoubleConverter", "decrypt failed", e)
+            null
         }
     }
 
     private fun isPlainDouble(str: String): Boolean {
-        // Simple regex check: optional minus, digits, optional dot, optional digits
-        return str.matches(Regex("^-?\\d*(\\.\\d+)?$"))
+        // Must have at least one digit, optional minus, optional dot with digits
+        return str.matches(Regex("^-?\\d+(\\.\\d+)?$"))
     }
 }

@@ -58,6 +58,7 @@ import com.huaying.xstz.ui.assetoverview.TrendChartSection
 import com.huaying.xstz.ui.assetoverview.CalendarView
 import com.huaying.xstz.ui.assetoverview.MergedDailyPnLCard
 import com.huaying.xstz.ui.theme.*
+import com.huaying.xstz.util.AppConstants
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.threeten.bp.LocalDate
@@ -71,10 +72,10 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object ChartDataCache {
     private val cache = ConcurrentHashMap<String, PreparedChartData>()
-    private const val MAX_CACHE_SIZE = 10
-    
+    private const val MAX_CACHE_SIZE = AppConstants.MAX_CHART_CACHE_SIZE
+
     fun get(key: String): PreparedChartData? = cache[key]
-    
+
     fun put(key: String, data: PreparedChartData) {
         if (cache.size >= MAX_CACHE_SIZE) {
             // LRU策略：移除最早的条目
@@ -108,8 +109,8 @@ class OptimizedChartsViewModel(
     private val _uiState = MutableStateFlow<ChartsUiState>(ChartsUiState.Loading)
     val uiState: StateFlow<ChartsUiState> = _uiState.asStateFlow()
     
-    // 用于骨架屏显示的数据流
-    private val _skeletonData = MutableStateFlow<SkeletonData?>(null)
+    // 用于骨架屏显示的数据流，初始值非null确保首帧就显示骨架屏，避免Loading小圆圈→骨架屏的布局跳变
+    private val _skeletonData = MutableStateFlow<SkeletonData?>(SkeletonData(TimeRange.WEEK, true))
     val skeletonData: StateFlow<SkeletonData?> = _skeletonData.asStateFlow()
     
     // 后台计算任务
@@ -507,9 +508,6 @@ private fun ChartsContent(
     val isDarkMode = darkTheme
     
     Scaffold(
-        modifier = Modifier.graphicsLayer {
-            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-        },
         topBar = {
             // 使用主题背景色半透明，与页面背景协调
             val backgroundColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
@@ -621,8 +619,8 @@ private fun SuccessContent(
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = 120.dp,
-                bottom = 140.dp
+                top = paddingValues.calculateTopPadding() + 8.dp,
+                bottom = 96.dp
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

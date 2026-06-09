@@ -87,9 +87,42 @@ fun AssetOverviewScreen(
     viewModel: AssetOverviewViewModel = viewModel(),
     darkTheme: Boolean = false,
     onNavigateToAddFund: () -> Unit = {},
-    onNavigateToFundDetail: (Fund) -> Unit = {}
+    onNavigateToFundDetail: (Fund) -> Unit = {},
+    initialFunds: List<Fund> = emptyList()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // 当 ViewModel 仍在 Loading 时，使用预加载数据计算合成状态，避免导航动画期间布局跳变
+    val displayState = when (val state = uiState) {
+        is AssetOverviewUiState.Success -> state
+        is AssetOverviewUiState.Loading -> {
+            val totalAssets = initialFunds.sumOf { it.holdingQuantity * it.currentPrice }
+            val principal = initialFunds.sumOf { it.totalCost }
+            val totalReturn = totalAssets - principal
+            val returnRate = if (principal > 0) totalReturn / principal * 100 else 0.0
+            val todayReturn = initialFunds.sumOf { it.holdingQuantity * it.currentPrice * it.changePercent / 100 }
+            val todayReturnRate = if (principal > 0) todayReturn / principal * 100 else 0.0
+            val stockValue = initialFunds.filter { it.type == AssetType.STOCK }.sumOf { it.holdingQuantity * it.currentPrice }
+            val bondValue = initialFunds.filter { it.type == AssetType.BOND }.sumOf { it.holdingQuantity * it.currentPrice }
+            val commodityValue = initialFunds.filter { it.type == AssetType.COMMODITY }.sumOf { it.holdingQuantity * it.currentPrice }
+            val cashValue = initialFunds.filter { it.type == AssetType.CASH }.sumOf { it.holdingQuantity * it.currentPrice }
+            AssetOverviewUiState.Success(
+                summary = AssetSummary(
+                    totalAssets = totalAssets, principal = principal,
+                    totalReturn = totalReturn, returnRate = returnRate,
+                    todayReturn = todayReturn, todayReturnRate = todayReturnRate,
+                    stockValue = stockValue, bondValue = bondValue,
+                    commodityValue = commodityValue, cashValue = cashValue,
+                    stockRatio = if (totalAssets > 0) stockValue / totalAssets * 100 else 0.0,
+                    bondRatio = if (totalAssets > 0) bondValue / totalAssets * 100 else 0.0,
+                    commodityRatio = if (totalAssets > 0) commodityValue / totalAssets * 100 else 0.0,
+                    cashRatio = if (totalAssets > 0) cashValue / totalAssets * 100 else 0.0
+                ),
+                funds = initialFunds
+            )
+        }
+        is AssetOverviewUiState.Error -> state
+    }
     val selectedDate by viewModel.selectedDate.collectAsState()
     rememberCoroutineScope()
     val isDarkMode = darkTheme
@@ -123,7 +156,7 @@ fun AssetOverviewScreen(
     }
 
     val isRefreshing by remember {
-        derivedStateOf { (uiState as? AssetOverviewUiState.Success)?.summary?.isRefreshing == true }
+        derivedStateOf { (displayState as? AssetOverviewUiState.Success)?.summary?.isRefreshing == true }
     }
 
     val pullRefreshState = rememberPullRefreshState(isRefreshing, onRefresh)
@@ -138,14 +171,11 @@ fun AssetOverviewScreen(
     }
 
     val listState = rememberLazyListState()
+    var topBarHeight by remember { mutableStateOf(0.dp) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer {
-                // 启用硬件加速，提升动画性能
-                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-            }
     ) {
         Scaffold(
             topBar = {
@@ -180,18 +210,8 @@ fun AssetOverviewScreen(
                 },
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
-            when (val state = uiState) {
-            is AssetOverviewUiState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = BrandBlue)
-                }
-            }
-
+            topBarHeight = paddingValues.calculateTopPadding()
+            when (val state = displayState) {
             is AssetOverviewUiState.Success -> {
                 Box(
                     modifier = Modifier
@@ -204,9 +224,9 @@ fun AssetOverviewScreen(
                             .pullRefresh(pullRefreshState),
                         contentPadding = PaddingValues(
                             start = 16.dp,
-                            top = 120.dp, // 从标题栏下方开始，确保内容不被标题栏遮挡
+                            top = paddingValues.calculateTopPadding() + 8.dp,
                             end = 16.dp,
-                            bottom = 140.dp // 增加底部padding，确保最后一个项目可以滚动到导航栏上方完全可见
+                            bottom = 96.dp
                         ),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -273,6 +293,18 @@ fun AssetOverviewScreen(
                     }
                 }
             }
+
+            is AssetOverviewUiState.Loading -> {
+                // initialFunds 为空时的兜底，正常情况下 displayState 不会是 Loading
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = BrandBlue)
+                }
+            }
             }
         }
 
@@ -281,7 +313,7 @@ fun AssetOverviewScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 60.dp) // 调整顶部padding，确保在标题栏下方
+                    .padding(top = topBarHeight)
             ) {
                 PullRefreshIndicator(
                     refreshing = isRefreshing,
@@ -380,7 +412,7 @@ fun SummaryCard(
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SummaryItem(
                         label = "总资产",
-                        value = viewModel.formatCurrency(summary.totalAssets, summary.isPrivacyMode),
+                        value = viewModel.formatCurrency(summary.totalAssets),
                         color = MaterialTheme.colorScheme.onSurface,
                         isDarkMode = isDarkMode
                     )
@@ -388,7 +420,7 @@ fun SummaryCard(
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SummaryItem(
                         label = "本金",
-                        value = viewModel.formatCurrency(summary.principal, summary.isPrivacyMode),
+                        value = viewModel.formatCurrency(summary.principal),
                         color = MaterialTheme.colorScheme.onSurface,
                         isDarkMode = isDarkMode
                     )
@@ -402,7 +434,7 @@ fun SummaryCard(
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SummaryItem(
                         label = "今日收益",
-                        value = viewModel.formatCurrency(summary.todayReturn, summary.isPrivacyMode),
+                        value = viewModel.formatCurrency(summary.todayReturn),
                         color = todayReturnColor,
                         isDarkMode = isDarkMode
                     )
@@ -411,7 +443,7 @@ fun SummaryCard(
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SummaryItem(
                         label = "累计收益",
-                        value = if (summary.isPrivacyMode) "¥ ****" else "${viewModel.formatCurrency(summary.totalReturn, false)} (${viewModel.formatPercent(summary.returnRate, false)})",
+                        value = if (summary.isPrivacyMode) "¥ ****" else "${viewModel.formatCurrency(summary.totalReturn)} (${viewModel.formatPercent(summary.returnRate)})",
                         color = returnColor,
                         isDarkMode = isDarkMode
                     )
@@ -776,8 +808,8 @@ fun FundListItem(
 ) {
     val currentValue = fund.holdingQuantity * fund.currentPrice
     val currentRatio = viewModel.getFundDisplayRatio(fund, totalAssets)
-    val (_, _) = viewModel.calculateDeviation(fund, totalAssets)
-    val status = viewModel.getFundStatus(fund, totalAssets, rebalanceThreshold)
+    val (_, _) = RebalanceCalculator.calculateDeviation(fund, totalAssets)
+    val status = viewModel.getFundStatus(fund, totalAssets)
 
     val statusColor = when (status) {
         "正常" -> SuccessGreen
@@ -899,7 +931,7 @@ fun FundListItem(
                 if (fund.type == AssetType.CASH) {
                     InfoItem(
                         label = "当前市值", 
-                        value = viewModel.formatCurrency(currentValue, isPrivacyMode),
+                        value = viewModel.formatCurrency(currentValue),
                         alignment = Alignment.Start,
                         isDarkMode = isDarkMode
                     )
@@ -918,14 +950,14 @@ fun FundListItem(
                     )
                     InfoItem(
                         label = "涨幅",
-                        value = viewModel.formatPercent(fund.changePercent, isPrivacyMode),
+                        value = viewModel.formatPercent(fund.changePercent),
                         valueColor = changeColor,
                         alignment = Alignment.CenterHorizontally,
                         isDarkMode = isDarkMode
                     )
                     InfoItem(
                         label = "当前市值", 
-                        value = viewModel.formatCurrency(currentValue, isPrivacyMode),
+                        value = viewModel.formatCurrency(currentValue),
                         alignment = Alignment.CenterHorizontally,
                         isDarkMode = isDarkMode
                     )

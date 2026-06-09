@@ -115,6 +115,7 @@ class SntpClient {
             _ntpTimeReference = responseTicks
             _roundTripTime = roundTripTime
         } catch (e: Exception) {
+            android.util.Log.w("SntpClient", "request time failed from $host", e)
             return false
         } finally {
             socket?.close()

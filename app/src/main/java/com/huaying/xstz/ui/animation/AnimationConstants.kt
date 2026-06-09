@@ -22,8 +22,23 @@ object AnimationConstants {
         /** 启动动画时长 */
         const val SPLASH = 2000
 
-        /** 页面切换动画 */
-        const val PAGE_TRANSITION = 350
+        /** Tab切换动画 */
+        const val TAB_SWITCH = 280
+
+        /** 子页面进入动画（弹簧物理，感知时长） */
+        const val PAGE_PUSH = 350
+
+        /** 子页面返回动画（弹簧物理，感知时长） */
+        const val PAGE_POP = 300
+
+        /** 底部弹窗进入动画 */
+        const val SHEET_ENTER = 350
+
+        /** 底部弹窗退出动画 */
+        const val SHEET_EXIT = 300
+
+        /** 从子页返回Tab的淡入时长 */
+        const val TAB_RESUME = 250
 
         /** 内容加载动画 */
         const val CONTENT_LOAD = 400

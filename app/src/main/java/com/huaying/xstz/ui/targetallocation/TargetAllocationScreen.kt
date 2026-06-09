@@ -7,14 +7,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,10 +24,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.huaying.xstz.data.entity.Fund
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.repository.OperationLogger
+import com.huaying.xstz.ui.component.ThousandSeparatorTransformation
 import com.huaying.xstz.ui.theme.*
+import com.huaying.xstz.util.AppConstants
 import java.util.Locale
 
 /**
@@ -39,57 +40,40 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TargetAllocationScreen(
-    funds: List<Fund>,
     isDarkMode: Boolean = isSystemInDarkTheme(),
     onBack: () -> Unit,
-    onSave: (List<Fund>) -> Unit
+    initialFunds: List<Fund> = emptyList(),
+    viewModel: TargetAllocationViewModel = hiltViewModel()
 ) {
-    // 按类型排序，同类型按市值降序（与首页一致）
-    val sortedFunds = remember(funds) {
-        funds.sortedWith(
+    val uiState by viewModel.uiState.collectAsState()
+
+    // 当 ViewModel 仍在加载时，使用预加载数据计算显示值，避免导航动画期间布局跳变
+    val displayFunds = if (uiState.isLoading) {
+        initialFunds.sortedWith(
             compareBy<Fund> { it.type.ordinal }
                 .thenByDescending { it.holdingQuantity * it.currentPrice }
         )
-    }
-    
-    // 创建可编辑的临时状态（保持排序后的顺序）
-    var editedFunds by remember(sortedFunds) {
-        mutableStateOf(sortedFunds.map { it.copy() })
-    }
+    } else uiState.editedFunds
+    val displayTotalAssets = if (uiState.isLoading) {
+        initialFunds.sumOf { it.holdingQuantity * it.currentPrice }
+    } else uiState.totalAssets
+    val displayNonCashTotalRatio = if (uiState.isLoading) {
+        initialFunds.filter { it.type != AssetType.CASH }.sumOf { it.targetRatio * AppConstants.PERCENTAGE_BASE }
+    } else uiState.nonCashTotalRatio
+    val displayCashRatio = if (uiState.isLoading) {
+        (AppConstants.PERCENTAGE_BASE - displayNonCashTotalRatio).coerceAtLeast(AppConstants.ZERO_DOUBLE)
+    } else uiState.cashRatio
+    val displayIsValid = if (uiState.isLoading) {
+        displayNonCashTotalRatio <= AppConstants.PERCENTAGE_BASE && displayNonCashTotalRatio >= AppConstants.ZERO_DOUBLE
+    } else uiState.isValid
 
-    // 分离现金和非现金资产
-    val nonCashFunds = editedFunds.filter { it.type != AssetType.CASH }
-    val cashFund = editedFunds.find { it.type == AssetType.CASH }
-    
-    // 计算总资产（用于显示当前实际占比）
-    val totalAssets = editedFunds.sumOf { it.holdingQuantity * it.currentPrice }
-    
-    // 计算非现金资产的总和
-    val nonCashTotalRatio = nonCashFunds.sumOf { it.targetRatio * 100 }
-    // 现金占比自动计算：100% - 非现金资产总和
-    val cashRatio = (100.0 - nonCashTotalRatio).coerceAtLeast(0.0)
-    
-    // 更新现金账户的占比（自动计算）
-    if (cashFund != null) {
-        val cashIndex = editedFunds.indexOfFirst { it.type == AssetType.CASH }
-        if (cashIndex >= 0 && kotlin.math.abs(editedFunds[cashIndex].targetRatio * 100 - cashRatio) > 0.01) {
-            editedFunds = editedFunds.toMutableList().apply {
-                this[cashIndex] = cashFund.copy(targetRatio = cashRatio / 100.0)
-            }
-        }
-    }
-    
-    // 验证：非现金资产总和必须 <= 100%（给现金留出空间）
-    val isValid = nonCashTotalRatio <= 100.0 && nonCashTotalRatio >= 0
-
-    // 添加LazyListState以支持自动滚动
     val lazyListState = rememberLazyListState()
 
     // 记录页面查看
     LaunchedEffect(Unit) {
         OperationLogger.logPageView("目标占比配置")
     }
-    
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -117,10 +101,9 @@ fun TargetAllocationScreen(
         },
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            // 底部状态栏和操作按钮
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = if (isDarkMode) DarkSurface else LightSurface,
+                color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 8.dp
             ) {
                 Column(
@@ -128,7 +111,6 @@ fun TargetAllocationScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                         .padding(bottom = 16.dp)
                 ) {
-                    // 非现金资产总和
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -141,12 +123,12 @@ fun TargetAllocationScreen(
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "%.2f%%".format(Locale.CHINA, nonCashTotalRatio),
+                                ThemeConstants.Format.PERCENT_2F.format(Locale.CHINA, displayNonCashTotalRatio),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isValid) SuccessGreen else DangerRed
+                                color = if (displayIsValid) SuccessGreen else DangerRed
                             )
-                            if (!isValid) {
+                            if (!displayIsValid) {
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
                                     Icons.Default.Warning,
@@ -157,8 +139,7 @@ fun TargetAllocationScreen(
                             }
                         }
                     }
-                    
-                    // 现金占比（自动计算）- 始终显示，避免高度抖动
+
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -171,14 +152,14 @@ fun TargetAllocationScreen(
                             color = if (isDarkMode) DarkTextSecondary else LightTextSecondary
                         )
                         Text(
-                            "%.2f%%".format(Locale.CHINA, cashRatio),
+                            ThemeConstants.Format.PERCENT_2F.format(Locale.CHINA, displayCashRatio),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = BrandBlue
                         )
                     }
-                    
-                    if (!isValid) {
+
+                    if (!displayIsValid) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             "非现金资产总和不能超过100%",
@@ -186,16 +167,15 @@ fun TargetAllocationScreen(
                             color = DangerRed
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.height(12.dp))
-                    
-                    // 保存按钮
+
                     Button(
                         onClick = {
                             OperationLogger.logButtonClick("保存目标配置", "目标占比配置")
-                            onSave(editedFunds)
+                            viewModel.save(onComplete = onBack)
                         },
-                        enabled = isValid,
+                        enabled = displayIsValid,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -210,7 +190,6 @@ fun TargetAllocationScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 提示信息
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -223,34 +202,27 @@ fun TargetAllocationScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "💡 调整各基金目标占比，现金占比将自动计算",
+                        "调整各基金目标占比，现金占比将自动计算",
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isDarkMode) DarkTextSecondary else LightTextSecondary
                     )
                 }
             }
-            
-            // 基金列表
+
             LazyColumn(
                 state = lazyListState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(editedFunds, key = { it.id }) { fund ->
-                    val index = editedFunds.indexOf(fund)
-                    val isCash = fund.type == AssetType.CASH
+                items(displayFunds, key = { it.id }) { fund ->
                     FundRatioCard(
                         fund = fund,
-                        totalAssets = totalAssets,
+                        totalAssets = displayTotalAssets,
                         isDarkMode = isDarkMode,
-                        isReadOnly = isCash,
+                        isReadOnly = fund.type == AssetType.CASH,
                         onRatioChange = { newRatio ->
-                            if (!isCash) {
-                                editedFunds = editedFunds.toMutableList().apply {
-                                    this[index] = fund.copy(targetRatio = newRatio / 100.0)
-                                }
-                            }
+                            viewModel.updateRatio(fund.id, newRatio)
                         }
                     )
                 }
@@ -268,42 +240,35 @@ private fun FundRatioCard(
     onRatioChange: (Double) -> Unit
 ) {
     val assetColor = getColorForAssetType(fund.type)
-    val ratioPercent = fund.targetRatio * 100
-    
-    // 计算当前实际占比
+    val ratioPercent = fund.targetRatio * AppConstants.PERCENTAGE_BASE
+
     val currentValue = fund.holdingQuantity * fund.currentPrice
     val actualRatio = if (totalAssets > 0) (currentValue / totalAssets * 100) else 0.0
-    
-    var inputValue by remember(ratioPercent) { 
-        mutableStateOf("%.2f".format(Locale.CHINA, ratioPercent)) 
+
+    var inputValue by remember(ratioPercent) {
+        mutableStateOf("%.2f".format(Locale.CHINA, ratioPercent))
     }
     var isError by remember { mutableStateOf(false) }
-    
-    // 添加FocusRequester以支持自动聚焦
+
     val focusRequester = remember { FocusRequester() }
-    
-    // 只读状态下的颜色
-    if (isDarkMode) DarkTextSecondary.copy(alpha = 0.5f) else LightTextSecondary.copy(alpha = 0.5f)
-    
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDarkMode) DarkSurface else LightSurface
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // 第一行：基金名称 + 目标占比输入
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // 类型指示点
                     Box(
                         modifier = Modifier
                             .size(8.dp)
@@ -326,18 +291,15 @@ private fun FundRatioCard(
                         }
                     }
                 }
-                
-                // 目标占比显示/输入
+
                 if (isReadOnly) {
-                    // 现金账户显示占比
                     Text(
-                        "%.2f%%".format(Locale.CHINA, ratioPercent),
+                        ThemeConstants.Format.PERCENT_2F.format(Locale.CHINA, ratioPercent),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = BrandBlue
                     )
                 } else {
-                    // 可编辑的占比输入框 - 简洁样式，百分比在内部居中
                     Box(
                         modifier = Modifier
                             .width(100.dp)
@@ -365,7 +327,7 @@ private fun FundRatioCard(
                                     if (dotCount <= 1) {
                                         val value = filtered.toDoubleOrNull()
                                         if (value != null) {
-                                            if (value <= 100.0) {
+                                            if (value <= AppConstants.PERCENTAGE_BASE) {
                                                 inputValue = filtered
                                                 if (value >= 0.0) {
                                                     onRatioChange(value)
@@ -374,8 +336,8 @@ private fun FundRatioCard(
                                                     isError = true
                                                 }
                                             } else {
-                                                inputValue = "100"
-                                                onRatioChange(100.0)
+                                                inputValue = AppConstants.PERCENTAGE_BASE_INT.toString()
+                                                onRatioChange(AppConstants.PERCENTAGE_BASE)
                                                 isError = false
                                             }
                                         } else {
@@ -392,7 +354,8 @@ private fun FundRatioCard(
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     fontWeight = FontWeight.Bold,
                                     color = assetColor
-                                )
+                                ),
+                                visualTransformation = ThousandSeparatorTransformation()
                             )
                             Text(
                                 text = "%",
@@ -404,18 +367,15 @@ private fun FundRatioCard(
                     }
                 }
             }
-            
-            // 现金账户只显示基本信息
+
             if (!isReadOnly) {
                 Spacer(modifier = Modifier.height(12.dp))
-                
-                // 第二行：当前实际占比 + 滑块
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 当前实际占比
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             "当前",
@@ -423,21 +383,20 @@ private fun FundRatioCard(
                             color = if (isDarkMode) DarkTextSecondary else LightTextSecondary
                         )
                         Text(
-                            "%.1f%%".format(Locale.CHINA, actualRatio),
+                            ThemeConstants.Format.PERCENT_1F.format(Locale.CHINA, actualRatio),
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (isDarkMode) DarkTextSecondary else LightTextSecondary
                         )
                     }
-                    
-                    // 滑块
+
                     Slider(
                         value = ratioPercent.toFloat(),
                         onValueChange = { newValue ->
                             onRatioChange(newValue.toDouble())
-                            inputValue = "%.2f".format(Locale.CHINA, newValue)
+                            inputValue = newValue.toDouble().toString()
                             isError = false
                         },
-                        valueRange = 0f..100f,
+                        valueRange = AppConstants.ZERO_FLOAT..AppConstants.PERCENTAGE_BASE_INT.toFloat(),
                         modifier = Modifier.weight(1f),
                         colors = SliderDefaults.colors(
                             thumbColor = assetColor,
@@ -445,8 +404,7 @@ private fun FundRatioCard(
                             inactiveTrackColor = if (isDarkMode) DarkPriceBox else LightPriceBox
                         )
                     )
-                    
-                    // 目标占比标签
+
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             "目标",
@@ -454,22 +412,21 @@ private fun FundRatioCard(
                             color = assetColor
                         )
                         Text(
-                            "%.1f%%".format(Locale.CHINA, ratioPercent),
+                            ThemeConstants.Format.PERCENT_1F.format(Locale.CHINA, ratioPercent),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = assetColor
                         )
                     }
                 }
-                
-                // 快捷按钮（简化版）
+
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(0, 10, 20, 30, 50).forEach { preset ->
-                        val isSelected = kotlin.math.abs(ratioPercent - preset) < 0.5
+                    AppConstants.PRESET_RATIOS.forEach { preset ->
+                        val isSelected = kotlin.math.abs(ratioPercent - preset) < AppConstants.PRESET_RATIO_TOLERANCE
                         Surface(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(20.dp),
@@ -490,7 +447,7 @@ private fun FundRatioCard(
                         }
                     }
                 }
-                
+
                 if (isError) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(

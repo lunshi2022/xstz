@@ -1,6 +1,7 @@
 package com.huaying.xstz.data.repository
 
 import android.os.SystemClock
+import com.huaying.xstz.util.AppConstants
 import com.huaying.xstz.util.SntpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,8 +46,8 @@ object TimeRepository {
     
     private fun syncNtp(host: String): Boolean {
         val sntpClient = SntpClient()
-        // 5秒超时
-        if (sntpClient.requestTime(host, 5000)) {
+        // NTP请求超时时间
+        if (sntpClient.requestTime(host, AppConstants.NTP_TIMEOUT_MS)) {
             val ntpTime = sntpClient.getNtpTime()
             val ntpTimeReference = sntpClient.getNtpTimeReference()
             
@@ -83,7 +84,7 @@ object TimeRepository {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("TimeRepository", "syncHttp failed", e)
             // 失败时保持原有 offset (即继续使用之前的同步结果或本地时间)
         }
     }

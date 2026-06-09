@@ -1,6 +1,35 @@
 package com.huaying.xstz.ui.navigation
 
 /**
+ * 路由常量集中管理
+ */
+object Route {
+    // 底部导航页
+    const val HOME = "home"
+    const val CHARTS = "charts"
+    const val REBALANCE = "rebalance"
+    const val SETTINGS = "settings"
+
+    // 子页面
+    const val ADD_FUND = "addFund"
+    const val TARGET_ALLOCATION = "targetAllocation"
+    const val OPERATION_LOG = "operationLog"
+    const val ABOUT = "about"
+    const val GUIDE = "guide"
+
+    // 带参数的子页面（路由模式，用于NavHost注册）
+    const val FUND_DETAIL = "fundDetail/{fundId}"
+    const val TRANSACTION_HISTORY = "transactionHistory/{fundId}"
+
+    // 构建带参数的路由（用于navigate调用）
+    fun fundDetail(fundId: Long) = "fundDetail/$fundId"
+    fun transactionHistory(fundId: Long) = "transactionHistory/$fundId"
+
+    // 所有底部导航路由
+    val MAIN_ROUTES = listOf(HOME, CHARTS, REBALANCE, SETTINGS)
+}
+
+/**
  * 导航方向枚举
  */
 enum class NavigationDirection {

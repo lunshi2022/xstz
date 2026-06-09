@@ -61,15 +61,15 @@ fun GuideScreen(
             }
         },
         containerColor = backgroundColor
-    ) { _ ->
+    ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
-                top = 120.dp, // 从标题栏下方开始
+                top = paddingValues.calculateTopPadding() + 8.dp,
                 end = 16.dp,
-                bottom = 140.dp // 确保最后一个项目可以滚动到导航栏上方完全可见
+                bottom = paddingValues.calculateBottomPadding() + 8.dp
             ),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -100,7 +100,7 @@ fun GuideScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -129,7 +129,7 @@ fun DetailedGuideCard(section: DetailedGuideSection) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(

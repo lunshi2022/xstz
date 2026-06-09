@@ -79,14 +79,14 @@ object HolidayRepository {
                                 val date = LocalDate.parse(dateStr, dateFormatter)
                                 holidays.add(date)
                             } catch (e: Exception) {
-                                e.printStackTrace()
+                                android.util.Log.w("HolidayRepository", "parse date failed: $dateStr", e)
                             }
                         }
                     }
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("HolidayRepository", "fetch holidays failed", e)
             // 网络失败时，使用内置的节假日数据
             holidays.addAll(getBuiltinHolidays(year))
         }

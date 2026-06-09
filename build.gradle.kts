@@ -8,4 +8,7 @@ plugins {
 
     // KSP 也要对应 Kotlin 版本 (1.9.22 对应 1.0.17)
     id("com.google.devtools.ksp") version "1.9.22-1.0.17" apply false
+
+    // Hilt
+    id("com.google.dagger.hilt.android") version "2.50" apply false
 }

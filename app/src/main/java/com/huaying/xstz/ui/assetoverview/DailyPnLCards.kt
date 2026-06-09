@@ -36,10 +36,10 @@ import com.huaying.xstz.data.entity.toDisplayName
 
 @Composable
 fun MergedDailyPnLCard(
-    dailyPnLData: AssetOverviewViewModel.DailyPnLData?,
+    dailyPnLData: DailyPnLData?,
     viewModel: AssetOverviewViewModel,
     isPrivacyMode: Boolean = false,
-    onFundClick: (AssetOverviewViewModel.FundDailyPnL) -> Unit = {}
+    onFundClick: (FundDailyPnL) -> Unit = {}
 ) {
     val returnColor by animateColorAsState(
         targetValue = if (dailyPnLData != null && dailyPnLData.totalDailyReturn >= 0) {
@@ -93,7 +93,7 @@ fun MergedDailyPnLCard(
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = if (dailyPnLData != null && dailyPnLData.hasRecord) {
-                            viewModel.formatCurrency(dailyPnLData.totalDailyReturn, false)
+                            viewModel.formatCurrency(dailyPnLData.totalDailyReturn)
                         } else "--",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
@@ -126,7 +126,7 @@ fun MergedDailyPnLCard(
                 ) {
                     DailyPnLItem(
                         label = "日收益率",
-                        value = viewModel.formatPercent(dailyPnLData.totalDailyReturnRate, false),
+                        value = viewModel.formatPercent(dailyPnLData.totalDailyReturnRate),
                         color = returnColor
                     )
 
@@ -232,7 +232,7 @@ private fun DailyPnLItem(
 // 保留旧函数以保持向后兼容，但内部调用新的合并卡片
 @Composable
 fun DailyPnLCard(
-    dailyPnLData: AssetOverviewViewModel.DailyPnLData?,
+    dailyPnLData: DailyPnLData?,
     viewModel: AssetOverviewViewModel,
     isDarkMode: Boolean = false
 ) {
@@ -246,9 +246,9 @@ fun DailyPnLCard(
 
 @Composable
 fun DailyFundDetailList(
-    dailyPnLData: AssetOverviewViewModel.DailyPnLData?,
+    dailyPnLData: DailyPnLData?,
     isPrivacyMode: Boolean = false,
-    onFundClick: (AssetOverviewViewModel.FundDailyPnL) -> Unit = {}
+    onFundClick: (FundDailyPnL) -> Unit = {}
 ) {
     // 此函数现在为空实现，因为功能已合并到 MergedDailyPnLCard
     // 保留此函数以保持向后兼容
@@ -256,7 +256,7 @@ fun DailyFundDetailList(
 
 @Composable
 private fun DailyFundListItem(
-    fundPnL: AssetOverviewViewModel.FundDailyPnL,
+    fundPnL: FundDailyPnL,
     isPrivacyMode: Boolean = false,
     onClick: () -> Unit
 ) {

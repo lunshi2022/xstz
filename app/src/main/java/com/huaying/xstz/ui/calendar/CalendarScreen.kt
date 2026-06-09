@@ -1,6 +1,7 @@
 package com.huaying.xstz.ui.calendar
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
@@ -9,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.huaying.xstz.ui.animation.AnimationConstants
 import com.huaying.xstz.data.model.DailyAssetData
 import com.huaying.xstz.data.repository.FundRepository
 import com.huaying.xstz.data.repository.OperationLogger
@@ -121,8 +123,14 @@ fun CalendarScreen(
                     item {
                         AnimatedVisibility(
                             visible = selectedDate != null && selectedData != null,
-                            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+                            enter = expandVertically(
+                                expandFrom = Alignment.Top,
+                                animationSpec = tween(AnimationConstants.Duration.NORMAL, easing = AnimationConstants.Easing.Decelerate)
+                            ) + fadeIn(tween(AnimationConstants.Duration.NORMAL)),
+                            exit = shrinkVertically(
+                                shrinkTowards = Alignment.Top,
+                                animationSpec = tween(AnimationConstants.Duration.FAST, easing = AnimationConstants.Easing.Accelerate)
+                            ) + fadeOut(tween(AnimationConstants.Duration.FAST))
                         ) {
                             if (selectedDate != null && selectedData != null) {
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -138,15 +146,15 @@ fun CalendarScreen(
                     item {
                         AnimatedVisibility(
                             visible = selectedDate == null,
-                            enter = fadeIn(),
-                            exit = fadeOut()
+                            enter = fadeIn(tween(AnimationConstants.Duration.NORMAL)),
+                            exit = fadeOut(tween(AnimationConstants.Duration.FAST))
                         ) {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 16.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    containerColor = MaterialTheme.colorScheme.surface
                                 ),
                                 shape = MaterialTheme.shapes.medium
                             ) {

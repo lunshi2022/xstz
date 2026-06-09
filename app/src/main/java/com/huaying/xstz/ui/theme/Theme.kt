@@ -7,7 +7,42 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import kotlin.math.pow
 import androidx.compose.ui.platform.LocalContext
+
+/**
+ * 确保动态颜色方案中 surface 与 background 有足够层次区分。
+ *
+ * 策略：保留动态配色的色调，仅在 surface 与 background 过于接近时微调亮度，
+ * 避免硬编码覆盖导致动态主题失效。
+ */
+private fun ColorScheme.ensureSurfaceHierarchy(darkTheme: Boolean): ColorScheme {
+    val surfaceLum = surface.luminance()
+    val bgLum = background.luminance()
+
+    // 判断 surface 与 background 是否过于接近（亮度差不足 0.03）
+    val needsFix = if (darkTheme) {
+        surfaceLum - bgLum < 0.03f
+    } else {
+        bgLum - surfaceLum < 0.03f
+    }
+
+    if (!needsFix) return this
+
+    return if (darkTheme) {
+        copy(background = Color(0xFF000000))
+    } else {
+        copy(background = Color(0xFFF5F5F7))
+    }
+}
+
+private fun Color.luminance(): Float {
+    // sRGB 相对亮度公式
+    val r = red.toDouble().let { if (it <= 0.03928) it / 12.92 else ((it + 0.055) / 1.055).pow(2.4) }
+    val g = green.toDouble().let { if (it <= 0.03928) it / 12.92 else ((it + 0.055) / 1.055).pow(2.4) }
+    val b = blue.toDouble().let { if (it <= 0.03928) it / 12.92 else ((it + 0.055) / 1.055).pow(2.4) }
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b).toFloat()
+}
 
 private val LightColors = lightColorScheme(
     primary = BrandBlue,
@@ -133,7 +168,11 @@ fun InvestmentManagerTheme(
 ) {
     // 根据dynamicColorEnabled决定是否使用系统动态颜色
     val targetColorScheme = if (dynamicColorEnabled) {
-        if (darkTheme) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
+        val dynamicScheme = if (darkTheme) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
+        // 动态颜色方案强制保障 surface/background 层次区分
+        dynamicScheme.ensureSurfaceHierarchy(darkTheme)
+            // 深色模式下强制 primary 为品牌蓝，避免动态配色的 primary 过暗导致光标不可见
+            .let { if (darkTheme) it.copy(primary = BrandBlue) else it }
     } else {
         if (darkTheme) DarkColors else LightColors
     }
