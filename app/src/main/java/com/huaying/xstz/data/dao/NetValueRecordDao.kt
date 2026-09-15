@@ -23,6 +23,9 @@ interface NetValueRecordDao {
     
     @Insert
     suspend fun insertRecord(record: NetValueRecord): Long
+
+    @Insert
+    suspend fun insertRecords(records: List<NetValueRecord>)
     
     @Update
     suspend fun updateRecord(record: NetValueRecord)

@@ -48,9 +48,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +61,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -81,6 +84,34 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/** ViewModel 仍在 Loading 时，用预加载数据合成的展示状态（结果由调用方 remember 缓存） */
+private fun buildLoadingState(initialFunds: List<Fund>): AssetOverviewUiState.Success {
+    val totalAssets = HoldingsCalculator.calculateTotalAssets(initialFunds)
+    val principal = HoldingsCalculator.calculateTotalCost(initialFunds)
+    val totalReturn = totalAssets - principal
+    val returnRate = HoldingsCalculator.calculateReturnRate(totalAssets, principal)
+    val todayReturn = HoldingsCalculator.calculateTodayReturn(initialFunds)
+    val todayReturnRate = if (principal > 0) todayReturn / principal * 100 else 0.0
+    val stockValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.STOCK)
+    val bondValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.BOND)
+    val commodityValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.COMMODITY)
+    val cashValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.CASH)
+    return AssetOverviewUiState.Success(
+        summary = AssetSummary(
+            totalAssets = totalAssets, principal = principal,
+            totalReturn = totalReturn, returnRate = returnRate,
+            todayReturn = todayReturn, todayReturnRate = todayReturnRate,
+            stockValue = stockValue, bondValue = bondValue,
+            commodityValue = commodityValue, cashValue = cashValue,
+            stockRatio = if (totalAssets > 0) stockValue / totalAssets * 100 else 0.0,
+            bondRatio = if (totalAssets > 0) bondValue / totalAssets * 100 else 0.0,
+            commodityRatio = if (totalAssets > 0) commodityValue / totalAssets * 100 else 0.0,
+            cashRatio = if (totalAssets > 0) cashValue / totalAssets * 100 else 0.0
+        ),
+        funds = initialFunds
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun AssetOverviewScreen(
@@ -93,34 +124,10 @@ fun AssetOverviewScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     // 当 ViewModel 仍在 Loading 时，使用预加载数据计算合成状态，避免导航动画期间布局跳变
+    val loadingState = remember(initialFunds) { buildLoadingState(initialFunds) }
     val displayState = when (val state = uiState) {
         is AssetOverviewUiState.Success -> state
-        is AssetOverviewUiState.Loading -> {
-            val totalAssets = HoldingsCalculator.calculateTotalAssets(initialFunds)
-            val principal = HoldingsCalculator.calculateTotalCost(initialFunds)
-            val totalReturn = totalAssets - principal
-            val returnRate = HoldingsCalculator.calculateReturnRate(totalAssets, principal)
-            val todayReturn = HoldingsCalculator.calculateTodayReturn(initialFunds)
-            val todayReturnRate = if (principal > 0) todayReturn / principal * 100 else 0.0
-            val stockValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.STOCK)
-            val bondValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.BOND)
-            val commodityValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.COMMODITY)
-            val cashValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.CASH)
-            AssetOverviewUiState.Success(
-                summary = AssetSummary(
-                    totalAssets = totalAssets, principal = principal,
-                    totalReturn = totalReturn, returnRate = returnRate,
-                    todayReturn = todayReturn, todayReturnRate = todayReturnRate,
-                    stockValue = stockValue, bondValue = bondValue,
-                    commodityValue = commodityValue, cashValue = cashValue,
-                    stockRatio = if (totalAssets > 0) stockValue / totalAssets * 100 else 0.0,
-                    bondRatio = if (totalAssets > 0) bondValue / totalAssets * 100 else 0.0,
-                    commodityRatio = if (totalAssets > 0) commodityValue / totalAssets * 100 else 0.0,
-                    cashRatio = if (totalAssets > 0) cashValue / totalAssets * 100 else 0.0
-                ),
-                funds = initialFunds
-            )
-        }
+        is AssetOverviewUiState.Loading -> loadingState
         is AssetOverviewUiState.Error -> state
     }
     val selectedDate by viewModel.selectedDate.collectAsState()
@@ -155,13 +162,26 @@ fun AssetOverviewScreen(
         }
     }
 
-    val isRefreshing by remember {
-        derivedStateOf { (displayState as? AssetOverviewUiState.Success)?.summary?.isRefreshing == true }
-    }
+    // 直接在组合期读取（读取廉价）；原 derivedStateOf 闭包捕获首次 displayState，会导致刷新指示器不出现
+    val isRefreshing = (displayState as? AssetOverviewUiState.Success)?.summary?.isRefreshing == true
 
     val pullRefreshState = rememberPullRefreshState(isRefreshing, onRefresh)
 
     val listState = rememberLazyListState()
+
+    // 前后台感知：退后台暂停自动刷新，回前台恢复（刷新节奏由 ViewModel 控制，保持不变）
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.setUiActive(true)
+                Lifecycle.Event.ON_PAUSE -> viewModel.setUiActive(false)
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(
         modifier = Modifier

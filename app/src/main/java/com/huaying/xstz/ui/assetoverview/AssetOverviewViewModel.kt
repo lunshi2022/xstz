@@ -70,6 +70,7 @@ class AssetOverviewViewModel @Inject constructor(
     private var refreshInterval = AppConstants.DEFAULT_REFRESH_INTERVAL_SECONDS
     private var refreshMode = 0
     private var isAutoRefreshEnabled = true
+    @Volatile private var isUiActive = true
     private var nextAutoRefreshTime = 0L
     private var chartCalculationJob: kotlinx.coroutines.Job? = null
 
@@ -222,18 +223,27 @@ class AssetOverviewViewModel @Inject constructor(
         isAutoRefreshEnabled = false
     }
 
+    fun setUiActive(active: Boolean) {
+        isUiActive = active
+    }
+
     private fun startAutoRefresh() {
         viewModelScope.launch {
             while (isAutoRefreshEnabled) {
-                if (_uiState.value is AssetOverviewUiState.Success) {
+                if (isUiActive && _uiState.value is AssetOverviewUiState.Success) {
                     val now = TimeRepository.getCurrentTimeMillis()
                     val shouldRefresh = if (refreshMode == 0) tradingTimeChecker.isTradingTime() else true
                     if (shouldRefresh && now >= nextAutoRefreshTime) {
                         refreshData(showLoading = false)
                         nextAutoRefreshTime = now + refreshInterval * AppConstants.MILLISECONDS_PER_SECOND
                     }
+                    // 按下次刷新时间休眠，避免固定 500ms 空转轮询
+                    val intervalMs = refreshInterval * AppConstants.MILLISECONDS_PER_SECOND
+                    delay((nextAutoRefreshTime - TimeRepository.getCurrentTimeMillis()).coerceIn(AppConstants.AUTO_REFRESH_CHECK_INTERVAL_MS, intervalMs))
+                } else {
+                    // 退后台时低频休眠，仅等待前台恢复标志
+                    delay(AppConstants.BACKGROUND_REFRESH_CHECK_INTERVAL_MS)
                 }
-                delay(AppConstants.AUTO_REFRESH_CHECK_INTERVAL_MS)
             }
         }
     }

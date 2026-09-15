@@ -110,7 +110,8 @@ fun ModernCalendar(
     onDateSelected: (LocalDate, DailyAssetData?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    val calendarData = data.associateBy { it.date }
+    // 以下聚合计算随数据/月份缓存，避免每次重组重算
+    val calendarData = remember(data) { data.associateBy { it.date } }
     val today = LocalDate.now()
     var currentMonth by remember { mutableStateOf(today) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
@@ -119,19 +120,25 @@ fun ModernCalendar(
     val showTodayButton = selectedDate != null && selectedDate != today
 
     // 计算全局最大盈亏用于热力图颜色映射
-    val maxProfit = data.filter { it.returnRate > 0 }.maxOfOrNull { it.returnRate } ?: 0.0
-    val maxLoss = data.filter { it.returnRate < 0 }.minOfOrNull { it.returnRate } ?: 0.0
+    val maxProfit = remember(data) {
+        data.filter { it.returnRate > 0 }.maxOfOrNull { it.returnRate } ?: 0.0
+    }
+    val maxLoss = remember(data) {
+        data.filter { it.returnRate < 0 }.minOfOrNull { it.returnRate } ?: 0.0
+    }
 
     // 计算月度统计
-    val monthData = data.filter {
-        it.date.month == currentMonth.month && it.date.year == currentMonth.year
+    val monthStats = remember(data, currentMonth) {
+        val monthData = data.filter {
+            it.date.month == currentMonth.month && it.date.year == currentMonth.year
+        }
+        // 只有当该月有数据时才计算收益率
+        val monthReturn = if (monthData.size >= 2) {
+            monthData.last().returnRate - monthData.first().returnRate
+        } else null  // 无数据时返回 null，不显示标签
+        Triple(monthData.count { it.returnRate > 0 }, monthData.count { it.returnRate < 0 }, monthReturn)
     }
-    val profitDays = monthData.count { it.returnRate > 0 }
-    val lossDays = monthData.count { it.returnRate < 0 }
-    // 只有当该月有数据时才计算收益率
-    val monthReturn = if (monthData.size >= 2) {
-        monthData.last().returnRate - monthData.first().returnRate
-    } else null  // 无数据时返回 null，不显示标签
+    val (profitDays, lossDays, monthReturn) = monthStats
 
     Card(
         modifier = modifier

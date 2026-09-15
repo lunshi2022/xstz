@@ -1,5 +1,6 @@
 package com.huaying.xstz.data.repository
 import android.util.Log
+import androidx.room.withTransaction
 import com.huaying.xstz.data.AppDatabase
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
@@ -105,11 +106,12 @@ class FundRepository(
         try {
             val funds = getAllFunds().first()
             val updatedFunds = networkService.updateAllFundsRealtimeData(funds)
-            
-            updatedFunds.forEach { updatedFund ->
-                updateFund(updatedFund)
+
+            // 单事务批量更新，替代逐条 updateFund
+            if (updatedFunds.isNotEmpty()) {
+                database.fundDao().updateFunds(updatedFunds)
             }
-            
+
             true
         } catch (e: Exception) {
             Log.e("FundRepository", "updateAllFundsRealtimeData failed", e)
@@ -233,13 +235,15 @@ class FundRepository(
         transactions: List<Transaction>,
         records: List<NetValueRecord>
     ) = withContext(Dispatchers.IO) {
-        // runInTransaction 不支持挂起函数，所以我们需要在外部逐个执行或使用其他方式
-        // 这里为了保证原子性，可以考虑在 DAO 中提供批量插入的方法，或者在这里手动处理
+        // clearAllTables 禁止在事务内调用，必须放在外部
         database.clearAllTables()
-        
-        funds.forEach { database.fundDao().insertFund(it) }
-        transactions.forEach { database.transactionDao().insertTransaction(it) }
-        records.forEach { database.netValueRecordDao().insertRecord(it) }
+
+        // 单事务批量导入，保证原子性与导入速度
+        database.withTransaction {
+            if (funds.isNotEmpty()) database.fundDao().insertFunds(funds)
+            if (transactions.isNotEmpty()) database.transactionDao().insertTransactions(transactions)
+            if (records.isNotEmpty()) database.netValueRecordDao().insertRecords(records)
+        }
     }
 
     private suspend fun ensureDefaultCashFund() {

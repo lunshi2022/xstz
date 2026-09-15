@@ -188,7 +188,9 @@ fun TransactionHistoryScreen(
                         )
                     }
                 } else {
-                    val sortedTransactions = filteredTransactions.sortedByDescending { it.createdAt }
+                    val sortedTransactions = remember(filteredTransactions) {
+                        filteredTransactions.sortedByDescending { it.createdAt }
+                    }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),

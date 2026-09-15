@@ -27,9 +27,15 @@ interface FundDao {
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFund(fund: Fund): Long
-    
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFunds(funds: List<Fund>)
+
     @Update
     suspend fun updateFund(fund: Fund)
+
+    @Update
+    suspend fun updateFunds(funds: List<Fund>)
     
     @Delete
     suspend fun deleteFund(fund: Fund)

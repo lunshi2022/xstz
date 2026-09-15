@@ -105,6 +105,8 @@ object AppConstants {
     const val REFRESH_STARTUP_DELAY_MS = 500L
     /** 自动刷新检查间隔（毫秒） */
     const val AUTO_REFRESH_CHECK_INTERVAL_MS = 500L
+    /** 退后台后的休眠检查间隔（毫秒） */
+    const val BACKGROUND_REFRESH_CHECK_INTERVAL_MS = 2000L
 
     // ==================== 网络超时 ====================
     /** NTP请求超时（毫秒） */
