@@ -83,7 +83,7 @@ app/src/main/java/com/huaying/xstz/
 │   ├── dao/             # Room 数据访问对象
 │   ├── entity/          # Room 实体类
 │   ├── model/           # 业务数据模型
-│   ├── network/         # 网络服务接口层（FundNetworkService 接口 + TencentFundNetworkService 实现）
+│   ├── network/         # 网络服务接口层（FundNetworkService 接口 + TencentFundNetworkService 实现 + TencentApiParser 纯解析器）
 │   ├── repository/      # 仓库层（数据操作、日志、时间、节假日、更新检查）
 │   ├── security/        # 加密管理（CryptoManager.kt）
 │   ├── AppDatabase.kt   # Room 数据库入口（当前版本 v6）
@@ -119,14 +119,20 @@ app/src/main/java/com/huaying/xstz/
 │   ├── FormatUtils.kt   # 格式化工具
 │   ├── HoldingsCalculator.kt # 持仓计算器
 │   ├── InstallUtil.kt   # 安装工具
+│   ├── RebalanceCalculations.kt # 再平衡核心计算（自 ui/rebalance 迁入，纯函数）
 │   └── SntpClient.kt    # SNTP 时间同步
 ├── InvestmentApp.kt     # Application 类（@HiltAndroidApp）
 └── MainActivity.kt      # 主 Activity（Compose 入口）
 
 app/src/test/java/com/huaying/xstz/
+├── data/network/
+│   └── TencentApiParserTest.kt # 腾讯接口解析测试（字段索引回归防线）
+├── ui/assetoverview/
+│   └── TradingTimeCheckerTest.kt # 交易时段决策边界测试
 └── util/                # 单元测试
     ├── FormatUtilsTest.kt      # 格式化工具测试
-    └── HoldingsCalculatorTest.kt # 持仓计算器测试
+    ├── HoldingsCalculatorTest.kt # 持仓计算器测试
+    └── RebalanceCalculationsTest.kt # 再平衡核心计算测试
 ```
 
 ---

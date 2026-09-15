@@ -1,9 +1,7 @@
-package com.huaying.xstz.ui.rebalance
+package com.huaying.xstz.util
 
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
-import com.huaying.xstz.util.AppConstants
-import com.huaying.xstz.util.HoldingsCalculator
 import kotlin.math.abs
 import kotlin.math.round
 

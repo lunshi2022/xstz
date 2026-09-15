@@ -52,19 +52,7 @@ class TradingTimeChecker {
             return "节假日休市"
         }
 
-        val timeInMinutes = getTimeInMinutes(calendar)
-        val morningStart = MORNING_START_HOUR * MINUTES_PER_HOUR + MORNING_START_MINUTE
-        val morningEnd = MORNING_END_HOUR * MINUTES_PER_HOUR + MORNING_END_MINUTE
-        val afternoonStart = AFTERNOON_START_HOUR * MINUTES_PER_HOUR
-        val afternoonEnd = AFTERNOON_END_HOUR * MINUTES_PER_HOUR
-
-        return when {
-            timeInMinutes < morningStart -> "未开盘"
-            timeInMinutes in morningStart..morningEnd -> "交易中"
-            timeInMinutes in morningEnd + 1..afternoonStart - 1 -> "午间休盘"
-            timeInMinutes in afternoonStart..afternoonEnd -> "交易中"
-            else -> "已收盘"
-        }
+        return marketStatusForTradingDay(getTimeInMinutes(calendar))
     }
 
     fun isTradingTime(): Boolean {
@@ -80,7 +68,30 @@ class TradingTimeChecker {
         val isTradingDay = checkIsTradingDay(currentDate, dayOfWeek)
         if (!isTradingDay) return false
 
-        val timeInMinutes = getTimeInMinutes(calendar)
+        return tradingTimeForTradingDay(getTimeInMinutes(calendar))
+    }
+
+    /**
+     * 纯决策逻辑：已知为交易日时，按 GMT+8 的"当日分钟数"给出市场状态。
+     * 与时钟/节假日数据源解耦，可被 JVM 单元测试覆盖边界。
+     */
+    internal fun marketStatusForTradingDay(timeInMinutes: Int): String {
+        val morningStart = MORNING_START_HOUR * MINUTES_PER_HOUR + MORNING_START_MINUTE
+        val morningEnd = MORNING_END_HOUR * MINUTES_PER_HOUR + MORNING_END_MINUTE
+        val afternoonStart = AFTERNOON_START_HOUR * MINUTES_PER_HOUR
+        val afternoonEnd = AFTERNOON_END_HOUR * MINUTES_PER_HOUR
+
+        return when {
+            timeInMinutes < morningStart -> "未开盘"
+            timeInMinutes in morningStart..morningEnd -> "交易中"
+            timeInMinutes in morningEnd + 1..afternoonStart - 1 -> "午间休盘"
+            timeInMinutes in afternoonStart..afternoonEnd -> "交易中"
+            else -> "已收盘"
+        }
+    }
+
+    /** 纯决策逻辑：已知为交易日时，按"当日分钟数"判断是否在交易时段 */
+    internal fun tradingTimeForTradingDay(timeInMinutes: Int): Boolean {
         val morningStart = MORNING_START_HOUR * MINUTES_PER_HOUR + MORNING_START_MINUTE
         val morningEnd = MORNING_END_HOUR * MINUTES_PER_HOUR + MORNING_END_MINUTE
         val afternoonStart = AFTERNOON_START_HOUR * MINUTES_PER_HOUR
