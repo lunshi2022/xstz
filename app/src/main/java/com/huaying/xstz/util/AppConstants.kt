@@ -39,14 +39,10 @@ object AppConstants {
     const val THRESHOLD_INPUT_MAX_LENGTH = 2
 
     // ==================== 再平衡阈值范围 ====================
-    /** 百分比模式最小阈值 */
-    const val THRESHOLD_PERCENT_MIN = 5
-    /** 百分比模式最大阈值 */
-    const val THRESHOLD_PERCENT_MAX = 25
-    /** 百分点模式最小阈值 */
-    const val THRESHOLD_POINT_MIN = 1
-    /** 百分点模式最大阈值 */
-    const val THRESHOLD_POINT_MAX = 10
+    /** 阈值最小值（两种模式统一） */
+    const val THRESHOLD_MIN = 1
+    /** 阈值最大值（两种模式统一） */
+    const val THRESHOLD_MAX = 10
 
     // ==================== 偏离度判断 ====================
     /** 严重偏离阈值（%） */
@@ -65,10 +61,8 @@ object AppConstants {
     const val REBALANCE_CASH_ITERATIONS = 1
     /** 再平衡收敛阈值 */
     const val REBALANCE_CONVERGENCE_THRESHOLD = 10.0
-    /** 默认百分比阈值 */
-    const val DEFAULT_THRESHOLD_PERCENT = 20f
-    /** 默认百分点阈值 */
-    const val DEFAULT_THRESHOLD_POINT = 5f
+    /** 默认阈值（两种模式统一） */
+    const val DEFAULT_THRESHOLD = 5f
 
     // ==================== 动画常量 ====================
     /** 骨架屏动画目标值 */

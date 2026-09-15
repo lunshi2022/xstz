@@ -1,11 +1,11 @@
 package com.huaying.xstz.ui.assetoverview
 
-import android.app.Application
 import com.huaying.xstz.data.repository.HolidayRepository
 import com.huaying.xstz.data.repository.TimeRepository
 import com.huaying.xstz.util.AppConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
@@ -14,7 +14,7 @@ import java.util.TimeZone
  * 交易时间检查器
  * 负责判断当前是否为交易时间，管理交易日缓存
  */
-class TradingTimeChecker(private val application: Application) {
+class TradingTimeChecker {
 
     companion object {
         private const val CHINA_TIMEZONE = "GMT+8"
@@ -29,7 +29,7 @@ class TradingTimeChecker(private val application: Application) {
         private const val MINUTES_PER_HOUR = 60
     }
 
-    private var cachedTradingDay: org.threeten.bp.LocalDate? = null
+    private var cachedTradingDay: LocalDate? = null
     private var cachedIsTradingDay: Boolean? = null
     private var lastTradingDayCheckTime: Long = 0
 
@@ -39,6 +39,17 @@ class TradingTimeChecker(private val application: Application) {
 
         if (dayOfWeek == Calendar.SATURDAY || dayOfWeek == Calendar.SUNDAY) {
             return "周末休市"
+        }
+
+        // 检查是否为法定节假日（工作日但休市）
+        val currentDate = LocalDate.of(
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH) + 1,
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+        val isTradingDay = checkIsTradingDay(currentDate, dayOfWeek)
+        if (!isTradingDay) {
+            return "节假日休市"
         }
 
         val timeInMinutes = getTimeInMinutes(calendar)
@@ -60,7 +71,7 @@ class TradingTimeChecker(private val application: Application) {
         val calendar = getChinaCalendar()
         val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
 
-        val currentDate = org.threeten.bp.LocalDate.of(
+        val currentDate = LocalDate.of(
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH) + 1,
             calendar.get(Calendar.DAY_OF_MONTH)
@@ -80,7 +91,7 @@ class TradingTimeChecker(private val application: Application) {
     }
 
     fun checkIsTradingDay(
-        date: org.threeten.bp.LocalDate,
+        date: LocalDate,
         dayOfWeek: Int,
         scope: CoroutineScope? = null
     ): Boolean {
@@ -101,7 +112,7 @@ class TradingTimeChecker(private val application: Application) {
 
         scope?.launch {
             try {
-                val result = HolidayRepository.isTradingDay(application, date)
+                val result = HolidayRepository.isTradingDay(date)
                 cachedTradingDay = date
                 cachedIsTradingDay = result
                 lastTradingDayCheckTime = now

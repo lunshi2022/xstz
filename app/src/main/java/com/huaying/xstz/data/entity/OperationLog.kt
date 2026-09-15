@@ -1,5 +1,9 @@
 package com.huaying.xstz.data.entity
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.huaying.xstz.data.repository.TimeRepository
@@ -109,49 +113,49 @@ fun OperationType.toDisplayName(): String {
     }
 }
 
-fun OperationType.toIcon(): String {
+fun OperationType.toIcon(): ImageVector {
     return when (this) {
-        // 基金操作 - 使用基金相关图标
-        OperationType.ADD_FUND -> "🏦"
-        OperationType.DELETE_FUND -> "🗑️"
-        OperationType.EDIT_FUND -> "✏️"
+        // 基金操作
+        OperationType.ADD_FUND -> Icons.Default.AccountBalance
+        OperationType.DELETE_FUND -> Icons.Default.Delete
+        OperationType.EDIT_FUND -> Icons.Default.Edit
 
-        // 交易操作 - 使用交易相关图标
-        OperationType.BUY -> "📥"
-        OperationType.SELL -> "📤"
-        OperationType.REBALANCE -> "⚖️"
-        OperationType.ADD_CASH -> "💰"
-        OperationType.WITHDRAW_CASH -> "💸"
-        OperationType.EDIT_HOLDING -> "📊"
-        OperationType.EDIT_COST -> "💵"
-        OperationType.EDIT_TARGET_RATIO -> "🎯"
-        OperationType.EDIT_ASSET_TYPE -> "🏷️"
+        // 交易操作
+        OperationType.BUY -> Icons.AutoMirrored.Filled.TrendingDown
+        OperationType.SELL -> Icons.AutoMirrored.Filled.TrendingUp
+        OperationType.REBALANCE -> Icons.AutoMirrored.Filled.CompareArrows
+        OperationType.ADD_CASH -> Icons.Default.AttachMoney
+        OperationType.WITHDRAW_CASH -> Icons.Default.MoneyOff
+        OperationType.EDIT_HOLDING -> Icons.Default.BarChart
+        OperationType.EDIT_COST -> Icons.Default.Paid
+        OperationType.EDIT_TARGET_RATIO -> Icons.Default.GpsFixed
+        OperationType.EDIT_ASSET_TYPE -> Icons.AutoMirrored.Filled.Label
 
-        // 数据操作 - 使用数据相关图标
-        OperationType.CLEAR_DATA -> "🧹"
-        OperationType.EXPORT_DATA -> "📤"
-        OperationType.IMPORT_DATA -> "📥"
+        // 数据操作
+        OperationType.CLEAR_DATA -> Icons.Default.DeleteSweep
+        OperationType.EXPORT_DATA -> Icons.Default.Upload
+        OperationType.IMPORT_DATA -> Icons.Default.Download
 
         // 设置操作
-        OperationType.SETTINGS_CHANGE -> "⚙️"
+        OperationType.SETTINGS_CHANGE -> Icons.Default.Settings
 
-        // 导航操作 - 使用导航相关图标
-        OperationType.PAGE_VIEW -> "👁️"
-        OperationType.PAGE_SWITCH -> "🔄"
+        // 导航操作
+        OperationType.PAGE_VIEW -> Icons.Default.Visibility
+        OperationType.PAGE_SWITCH -> Icons.Default.SwapHoriz
 
-        // 交互操作 - 使用交互相关图标
-        OperationType.BUTTON_CLICK -> "👆"
-        OperationType.ITEM_CLICK -> "📋"
-        OperationType.CHART_INTERACTION -> "📈"
+        // 交互操作
+        OperationType.BUTTON_CLICK -> Icons.Default.TouchApp
+        OperationType.ITEM_CLICK -> Icons.AutoMirrored.Filled.FormatListBulleted
+        OperationType.CHART_INTERACTION -> Icons.AutoMirrored.Filled.ShowChart
 
         // 系统操作
-        OperationType.SEARCH -> "🔍"
-        OperationType.FILTER -> "🔖"
-        OperationType.SORT -> "📊"
-        OperationType.REFRESH -> "🔄"
-        OperationType.EXPAND_COLLAPSE -> "📂"
+        OperationType.SEARCH -> Icons.Default.Search
+        OperationType.FILTER -> Icons.Default.FilterList
+        OperationType.SORT -> Icons.AutoMirrored.Filled.Sort
+        OperationType.REFRESH -> Icons.Default.Refresh
+        OperationType.EXPAND_COLLAPSE -> Icons.Default.UnfoldMore
 
         // 其他
-        OperationType.OTHER -> "📝"
+        OperationType.OTHER -> Icons.Default.Description
     }
 }

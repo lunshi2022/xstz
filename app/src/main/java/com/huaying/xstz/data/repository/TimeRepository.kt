@@ -8,8 +8,9 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import org.threeten.bp.LocalDate
-import org.threeten.bp.ZoneId
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 object TimeRepository {
     // 存储 "真实时间 - SystemClock.elapsedRealtime()" 的差值
@@ -26,7 +27,7 @@ object TimeRepository {
     }
     
     fun getCurrentLocalDate(): LocalDate {
-        return org.threeten.bp.Instant.ofEpochMilli(getCurrentTimeMillis())
+        return Instant.ofEpochMilli(getCurrentTimeMillis())
             .atZone(CHINA_ZONE)
             .toLocalDate()
     }

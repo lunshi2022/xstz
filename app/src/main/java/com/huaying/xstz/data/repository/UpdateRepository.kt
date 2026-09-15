@@ -75,7 +75,9 @@ class UpdateRepository(private val context: Context) {
                             versionName = latestVersionName,
                             versionCode = latestVersionCode,
                             downloadUrl = apkAsset.browser_download_url,
-                            releaseNotes = release.body
+                            releaseNotes = release.body,
+                            fileSize = apkAsset.size,
+                            publishDate = release.published_at
                         )
                     )
                 } else {

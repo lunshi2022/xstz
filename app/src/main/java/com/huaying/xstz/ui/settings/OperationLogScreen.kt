@@ -8,7 +8,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.*
@@ -17,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,7 +83,7 @@ fun OperationLogScreen(
                 title = { Text("操作记录") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
@@ -153,9 +156,11 @@ fun OperationLogScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(
-                                    "📝",
-                                    fontSize = 48.sp
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Note,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
@@ -297,9 +302,11 @@ private fun OperationLogItem(log: OperationLog) {
                     .background(getOperationTypeColor(log.operationType).copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = log.operationType.toIcon(),
-                    fontSize = 20.sp
+                Icon(
+                    imageVector = log.operationType.toIcon(),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = getOperationTypeColor(log.operationType)
                 )
             }
             
@@ -433,7 +440,7 @@ private fun FilterDialog(
                 // 全部选项
                 FilterOptionCard(
                     text = "全部",
-                    icon = "🔍",
+                    icon = Icons.Default.FilterList,
                     selected = currentFilter == null,
                     onClick = { onFilterSelected(null) }
                 )
@@ -508,7 +515,7 @@ private fun FilterDialog(
 @Composable
 private fun FilterOptionCard(
     text: String,
-    icon: String,
+    icon: ImageVector,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -542,9 +549,15 @@ private fun FilterOptionCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = icon,
-                    fontSize = 16.sp
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
             }
 
@@ -570,11 +583,11 @@ private fun FilterOptionCard(
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "✓",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }

@@ -7,23 +7,19 @@ import com.huaying.xstz.data.entity.NetValueRecord
 import com.huaying.xstz.data.entity.TargetAllocation
 import com.huaying.xstz.data.entity.Transaction
 import com.huaying.xstz.data.model.DailyAssetData
+import com.huaying.xstz.data.network.FundNetworkService
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.coroutineScope
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.threeten.bp.Instant
-import org.threeten.bp.ZoneId
+import java.time.Instant
+import java.time.ZoneId
 
 class FundRepository(
-    private val database: AppDatabase
+    private val database: AppDatabase,
+    private val networkService: FundNetworkService
 ) {
-    private val okHttpClient = OkHttpClient()
     
     // ========== Fund 操作 ==========
     fun getAllFunds(): Flow<List<Fund>> = database.fundDao().getAllFunds()
@@ -31,14 +27,29 @@ class FundRepository(
     suspend fun getAllFundsOnce(): List<Fund> = database.fundDao().getAllFunds().first()
     
     suspend fun getFundById(id: Long): Fund? = database.fundDao().getFundById(id)
+
+    fun getFundByIdFlow(id: Long): Flow<Fund?> = database.fundDao().getFundByIdFlow(id)
     
     suspend fun getFundByCode(code: String): Fund? = database.fundDao().getFundByCode(code)
     
     suspend fun getFundByCodeAndName(code: String, name: String): Fund? = database.fundDao().getFundByCodeAndName(code, name)
     
-    suspend fun insertFund(fund: Fund): Long = database.fundDao().insertFund(fund)
+    suspend fun insertFund(fund: Fund): Long {
+        val now = TimeRepository.getCurrentTimeMillis()
+        val fundWithTimestamp = if (fund.createdAt == 0L && fund.updatedAt == 0L) {
+            fund.copy(createdAt = now, updatedAt = now)
+        } else if (fund.updatedAt == 0L) {
+            fund.copy(updatedAt = now)
+        } else {
+            fund
+        }
+        return database.fundDao().insertFund(fundWithTimestamp)
+    }
     
     suspend fun updateFund(fund: Fund) = database.fundDao().updateFund(fund)
+
+    suspend fun updateFundTargetRatio(fundId: Long, targetRatio: Double, updatedAt: Long) =
+        database.fundDao().updateFundTargetRatio(fundId, targetRatio, updatedAt)
     
     suspend fun deleteFund(fund: Fund) = database.fundDao().deleteFund(fund)
 
@@ -79,287 +90,26 @@ class FundRepository(
 
     suspend fun deleteAllTransactions() = database.transactionDao().deleteAllTransactions()
 
+    // ========== 网络请求代理方法 ==========
     
-    // 基金查询结果数据类
-    data class FundQueryResult(
-        val stockName: String? = null,
-        val fundName: String? = null,
-        val stockError: String? = null,
-        val fundError: String? = null
-    ) {
-        val hasStockResult: Boolean get() = stockName != null
-        val hasFundResult: Boolean get() = fundName != null
-        val hasBothResults: Boolean get() = hasStockResult && hasFundResult
-        val hasAnyResult: Boolean get() = hasStockResult || hasFundResult
-    }
-
-    // 从网络获取基金名称（同时查询股票和基金接口）
-    suspend fun fetchFundInfoWithOptions(code: String): FundQueryResult = withContext(Dispatchers.IO) {
-        try {
-            // 移除空格
-            val trimmedCode = code.trim()
-
-            // 检查代码长度
-            if (trimmedCode.length != 6) {
-                return@withContext FundQueryResult(stockError = "代码长度错误", fundError = "代码长度错误")
-            }
-
-            // 对于可能是股票也可能是场外基金的代码（00开头），需要同时尝试两种接口
-            val isAmbiguousCode = trimmedCode.matches(Regex("^00[0-4]\\d{3}$"))
-
-            // 存储两种接口的结果
-            var stockResult: Pair<String?, String>? = null
-            var fundResult: Pair<String?, String>? = null
-
-            // 1. 尝试股票/场内基金接口
-            when {
-                isStockCode(trimmedCode) || isAmbiguousCode -> {
-                    val exchange = when {
-                        trimmedCode.startsWith("6") || trimmedCode.startsWith("9") -> "sh"
-                        trimmedCode.startsWith("0") || trimmedCode.startsWith("3") || trimmedCode.startsWith("2") -> "sz"
-                        else -> null
-                    }
-                    if (exchange != null) {
-                        stockResult = fetchFundInfoFromUrl("https://qt.gtimg.cn/q=${exchange}${trimmedCode}")
-                    }
-                }
-                is场内基金Code(trimmedCode) -> {
-                    val exchange = when {
-                        trimmedCode.startsWith("5") -> "sh"
-                        trimmedCode.startsWith("1") -> "sz"
-                        else -> null
-                    }
-                    if (exchange != null) {
-                        stockResult = fetchFundInfoFromUrl("https://qt.gtimg.cn/q=${exchange}${trimmedCode}")
-                    }
-                }
-            }
-
-            // 2. 尝试场外基金接口
-            if (is场外基金Code(trimmedCode) || isAmbiguousCode) {
-                fundResult = fetchFundInfoFromUrl("https://qt.gtimg.cn/q=jj${trimmedCode}")
-            }
-
-            FundQueryResult(
-                stockName = stockResult?.first,
-                fundName = fundResult?.first,
-                stockError = stockResult?.second,
-                fundError = fundResult?.second
-            )
-        } catch (e: Exception) {
-            Log.w("FundRepository", "fetchFundInfoWithOptions failed", e)
-            FundQueryResult(stockError = "查询失败", fundError = "查询失败")
-        }
-    }
-
-    // 从网络获取基金名称（兼容旧版本，优先返回基金结果）
-    suspend fun fetchFundInfo(code: String): Pair<String?, String> = withContext(Dispatchers.IO) {
-        val result = fetchFundInfoWithOptions(code)
-        when {
-            result.fundName != null -> Pair(result.fundName, "")
-            result.stockName != null -> Pair(result.stockName, "")
-            else -> Pair(null, result.fundError ?: result.stockError ?: "无法获取基金信息")
-        }
-    }
+    suspend fun fetchFundInfoWithOptions(code: String): FundNetworkService.FundQueryResult = 
+        networkService.fetchFundInfoWithOptions(code)
     
-    // 从指定URL获取基金信息
-    private fun fetchFundInfoFromUrl(url: String): Pair<String?, String> {
-        val request = Request.Builder()
-            .url(url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-            .header("Referer", "https://gu.qq.com/")
-            .build()
-        
-        val response = okHttpClient.newCall(request).execute()
-
-        if (response.isSuccessful && response.body != null) {
-            val content = response.body!!.string()
-
-            // 检查是否为空响应
-            if (content.isEmpty() || content.trim().isEmpty()) {
-                return Pair(null, "响应为空")
-            }
-
-            // 解析返回数据: v_sz159509="纳指科技ETF~1.234~..." 或 v_jj110022="易方达消费行业股票~1.234~..."
-            // 找到第一个 " 和最后一个 " 之间的内容
-            val startIndex = content.indexOf('"')
-            val endIndex = content.lastIndexOf('"')
-
-            if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
-                return Pair(null, "数据格式错误。响应: $content")
-            }
-
-            val data = content.substring(startIndex + 1, endIndex)
-
-            if (data.isEmpty()) {
-                return Pair(null, "数据为空。响应: $content")
-            }
-
-            val fields = data.split("~")
-
-            // 返回名称 (index 1)
-            return if (fields.size > 2 && fields[1].isNotEmpty()) {
-                Pair(fields[1], "")
-            } else {
-                Pair(null, "字段数量: ${fields.size}。数据: $data")
-            }
-        } else {
-            return Pair(null, "请求失败: ${response.code}")
-        }
-    }
+    suspend fun fetchFundInfo(code: String): Pair<String?, String> = 
+        networkService.fetchFundInfo(code)
     
-    // 判断是否为股票代码（根据中国市场规则）
-    private fun isStockCode(code: String): Boolean {
-        // 股票代码规则：
-        // 上海主板：600、601、603、605
-        // 上海科创板：688
-        // 上海B股：900
-        // 深圳主板（含中小板）：000、001、002、003、004
-        // 深圳创业板：300、301
-        // 深圳B股：200
-        // 北京证券交易所：43、83、87、88
-        return code.matches(Regex("^(60[0135]|688|900|00[0-4]|30[01]|200|43|8[378])\\d{3}$"))
-    }
+    suspend fun fetchStockRealtimeData(code: String): Map<String, Any>? = 
+        networkService.fetchStockRealtimeData(code)
     
-    // 判断是否为场内基金代码（根据中国市场规则）
-    private fun is场内基金Code(code: String): Boolean {
-        // 场内基金代码规则：
-        // 上海证券交易所：5、50、51、52
-        // 深圳证券交易所：15、16、18
-        return code.matches(Regex("^(5|50|51|52|15|16|18)\\d{4,5}$"))
-    }
-    
-    // 判断是否为场外基金代码（根据中国市场规则）
-    private fun is场外基金Code(code: String): Boolean {
-        // 场外基金代码规则：
-        // 除上述股票和场内基金开头之外的数字，尤其是0、00开头
-        return code.matches(Regex("^\\d{6}$")) && !isStockCode(code) && !is场内基金Code(code)
-    }
-    
-    // 从腾讯接口获取完整实时数据
-    suspend fun fetchStockRealtimeData(code: String): Map<String, Any>? = withContext(Dispatchers.IO) {
-        try {
-            // 移除空格
-            val trimmedCode = code.trim()
-            
-            // 检查代码长度
-            if (trimmedCode.length != 6) {
-                return@withContext null
-            }
-            
-            // 构建URL
-            val url = if (isStockCode(trimmedCode)) {
-                // 判断股票交易所
-                val exchange = when {
-                    trimmedCode.startsWith("6") || trimmedCode.startsWith("9") -> "sh"
-                    trimmedCode.startsWith("0") || trimmedCode.startsWith("3") || trimmedCode.startsWith("2") -> "sz"
-                    else -> return@withContext null
-                }
-                "https://qt.gtimg.cn/q=${exchange}${trimmedCode}"
-            } else if (is场内基金Code(trimmedCode)) {
-                // 场内基金使用股票接口
-                val exchange = when {
-                    trimmedCode.startsWith("5") -> "sh"
-                    trimmedCode.startsWith("1") -> "sz"
-                    else -> return@withContext null
-                }
-                "https://qt.gtimg.cn/q=${exchange}${trimmedCode}"
-            } else if (is场外基金Code(trimmedCode)) {
-                "https://qt.gtimg.cn/q=jj${trimmedCode}"
-            } else {
-                return@withContext null
-            }
-            
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-                .header("Referer", "https://gu.qq.com/")
-                .build()
-            val response = okHttpClient.newCall(request).execute()
-            
-            if (response.isSuccessful && response.body != null) {
-                val content = response.body!!.string()
-                // 解析返回数据: v_sz159509="纳指科技ETF~1.234~..." 或 v_jj110022="易方达消费行业股票~1.234~..."
-                val startIndex = content.indexOf('"')
-                val endIndex = content.lastIndexOf('"')
-
-                if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
-                    return@withContext null
-                }
-
-                val data = content.substring(startIndex + 1, endIndex)
-                val fields = data.split("~")
-
-                if (is场外基金Code(trimmedCode)) {
-                    // 场外基金数据解析
-                    if (fields.size > 8) {
-                        val result: Map<String, Any> = mapOf(
-                            "name" to fields[1],       // 基金名称
-                            "currentPrice" to (fields[6].toDoubleOrNull() ?: 0.0),   // 单位净值
-                            "preClosePrice" to 0.0, // 基金无昨收盘价
-                            "change" to 0.0,       // 基金无涨跌
-                            "changePercent" to (fields[8].toDoubleOrNull() ?: 0.0) // 日涨跌幅(%)
-                        )
-                        result
-                    } else {
-                        null
-                    }
-                } else if (is场内基金Code(trimmedCode) || isStockCode(trimmedCode)) {
-                    // 场内基金和股票数据解析
-                    if (fields.size > 32) {
-                        val result: Map<String, Any> = mapOf(
-                            "name" to fields[1],       // 名称
-                            "currentPrice" to (fields[3].toDoubleOrNull() ?: 0.0),   // 现价
-                            "preClosePrice" to (fields[4].toDoubleOrNull() ?: 0.0), // 昨收盘价
-                            "change" to (fields[31].toDoubleOrNull() ?: 0.0),       // 涨跌
-                            "changePercent" to (fields[32].toDoubleOrNull() ?: 0.0) // 涨跌幅(%)
-                        )
-                        result
-                    } else {
-                        null
-                    }
-                } else {
-                    null
-                }
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            Log.w("FundRepository", "fetchStockRealtimeData failed", e)
-            null
-        }
-    }
-
-    // 批量更新基金数据 - 使用并发请求加速
     suspend fun updateAllFundsRealtimeData(): Boolean = withContext(Dispatchers.IO) {
         try {
             val funds = getAllFunds().first()
+            val updatedFunds = networkService.updateAllFundsRealtimeData(funds)
             
-            // 使用 coroutineScope 和 async 实现并发请求
-            coroutineScope {
-                funds.map { fund ->
-                    async {
-                        try {
-                            // 使用腾讯接口获取数据
-                            val stockData = fetchStockRealtimeData(fund.code)
-                            if (stockData != null) {
-                                val updatedFund = fund.copy(
-                                    currentPrice = (stockData["currentPrice"] as? Double) ?: fund.currentPrice,
-                                    changePercent = (stockData["changePercent"] as? Double) ?: fund.changePercent,
-                                    updatedAt = TimeRepository.getCurrentTimeMillis()
-                                )
-                                updateFund(updatedFund)
-                            } else {
-                                null
-                            }
-                        } catch (e: Exception) {
-                            // 单个基金更新失败不影响其他基金
-                            Log.w("FundRepository", "update fund ${fund.code} failed", e)
-                            null
-                        }
-                    }
-                }.awaitAll() // 等待所有并发请求完成
+            updatedFunds.forEach { updatedFund ->
+                updateFund(updatedFund)
             }
+            
             true
         } catch (e: Exception) {
             Log.e("FundRepository", "updateAllFundsRealtimeData failed", e)
@@ -384,6 +134,9 @@ class FundRepository(
 
     fun getRecordsSince(startTime: Long): Flow<List<NetValueRecord>> =
         database.netValueRecordDao().getRecordsSince(startTime)
+
+    suspend fun getRecordBeforeTimestamp(timestamp: Long): NetValueRecord? =
+        database.netValueRecordDao().getRecordBeforeTimestamp(timestamp)
 
     /**
      * 获取处理后的每日资产数据流，用于图表显示。
@@ -414,15 +167,16 @@ class FundRepository(
     // 记录当前净值快照
     suspend fun recordCurrentSnapshot(): NetValueRecord? = withContext(Dispatchers.IO) {
         try {
-            val totalAssets = getTotalMarketValue()
-            val totalCost = getTotalCost()
+            val funds = getAllFundsOnce()
+            val totalAssets = com.huaying.xstz.util.HoldingsCalculator.calculateTotalAssets(funds)
+            val totalCost = com.huaying.xstz.util.HoldingsCalculator.calculateTotalCost(funds)
             val totalReturn = totalAssets - totalCost
             val returnRate = if (totalCost > 0) totalReturn / totalCost * 100 else 0.0
             
-            val stockValue = getMarketValueByType(AssetType.STOCK)
-            val bondValue = getMarketValueByType(AssetType.BOND)
-            val commodityValue = getMarketValueByType(AssetType.COMMODITY)
-            val cashValue = getMarketValueByType(AssetType.CASH)
+            val stockValue = com.huaying.xstz.util.HoldingsCalculator.calculateMarketValueByType(funds, AssetType.STOCK)
+            val bondValue = com.huaying.xstz.util.HoldingsCalculator.calculateMarketValueByType(funds, AssetType.BOND)
+            val commodityValue = com.huaying.xstz.util.HoldingsCalculator.calculateMarketValueByType(funds, AssetType.COMMODITY)
+            val cashValue = com.huaying.xstz.util.HoldingsCalculator.calculateMarketValueByType(funds, AssetType.CASH)
             
             NetValueRecord(
                 totalAssets = totalAssets,

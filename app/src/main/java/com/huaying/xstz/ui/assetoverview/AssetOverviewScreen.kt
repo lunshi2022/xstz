@@ -43,7 +43,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -62,12 +61,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
@@ -77,6 +76,7 @@ import com.huaying.xstz.ui.theme.DarkSurface
 import com.huaying.xstz.ui.theme.LightSurface
 import com.huaying.xstz.ui.theme.SuccessGreen
 import com.huaying.xstz.ui.theme.getColorForAssetType
+import com.huaying.xstz.util.HoldingsCalculator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -84,7 +84,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun AssetOverviewScreen(
-    viewModel: AssetOverviewViewModel = viewModel(),
+    viewModel: AssetOverviewViewModel = hiltViewModel(),
     darkTheme: Boolean = false,
     onNavigateToAddFund: () -> Unit = {},
     onNavigateToFundDetail: (Fund) -> Unit = {},
@@ -96,16 +96,16 @@ fun AssetOverviewScreen(
     val displayState = when (val state = uiState) {
         is AssetOverviewUiState.Success -> state
         is AssetOverviewUiState.Loading -> {
-            val totalAssets = initialFunds.sumOf { it.holdingQuantity * it.currentPrice }
-            val principal = initialFunds.sumOf { it.totalCost }
+            val totalAssets = HoldingsCalculator.calculateTotalAssets(initialFunds)
+            val principal = HoldingsCalculator.calculateTotalCost(initialFunds)
             val totalReturn = totalAssets - principal
-            val returnRate = if (principal > 0) totalReturn / principal * 100 else 0.0
-            val todayReturn = initialFunds.sumOf { it.holdingQuantity * it.currentPrice * it.changePercent / 100 }
+            val returnRate = HoldingsCalculator.calculateReturnRate(totalAssets, principal)
+            val todayReturn = HoldingsCalculator.calculateTodayReturn(initialFunds)
             val todayReturnRate = if (principal > 0) todayReturn / principal * 100 else 0.0
-            val stockValue = initialFunds.filter { it.type == AssetType.STOCK }.sumOf { it.holdingQuantity * it.currentPrice }
-            val bondValue = initialFunds.filter { it.type == AssetType.BOND }.sumOf { it.holdingQuantity * it.currentPrice }
-            val commodityValue = initialFunds.filter { it.type == AssetType.COMMODITY }.sumOf { it.holdingQuantity * it.currentPrice }
-            val cashValue = initialFunds.filter { it.type == AssetType.CASH }.sumOf { it.holdingQuantity * it.currentPrice }
+            val stockValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.STOCK)
+            val bondValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.BOND)
+            val commodityValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.COMMODITY)
+            val cashValue = HoldingsCalculator.calculateMarketValueByType(initialFunds, AssetType.CASH)
             AssetOverviewUiState.Success(
                 summary = AssetSummary(
                     totalAssets = totalAssets, principal = principal,
@@ -161,17 +161,7 @@ fun AssetOverviewScreen(
 
     val pullRefreshState = rememberPullRefreshState(isRefreshing, onRefresh)
 
-    // 计算下拉距离
-
-    // 控制指示器显示：下拉过程中和刷新时都显示
-    val isIndicatorVisible by remember {
-        derivedStateOf {
-            isRefreshing || pullRefreshState.progress > 0.05f
-        }
-    }
-
     val listState = rememberLazyListState()
-    var topBarHeight by remember { mutableStateOf(0.dp) }
 
     Box(
         modifier = Modifier
@@ -210,18 +200,17 @@ fun AssetOverviewScreen(
                 },
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
-            topBarHeight = paddingValues.calculateTopPadding()
             when (val state = displayState) {
             is AssetOverviewUiState.Success -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .pullRefresh(pullRefreshState)
                 ) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .pullRefresh(pullRefreshState),
+                            .fillMaxSize(),
                         contentPadding = PaddingValues(
                             start = 16.dp,
                             top = paddingValues.calculateTopPadding() + 8.dp,
@@ -259,16 +248,15 @@ fun AssetOverviewScreen(
                                 onFundClick = onNavigateToFundDetail
                             )
                         }
-
-                        if (state.summary.isRefreshing) {
-                            item {
-                                LinearProgressIndicator(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = BrandBlue
-                                )
-                            }
-                        }
                     }
+
+                    PullRefreshIndicator(
+                        refreshing = isRefreshing,
+                        state = pullRefreshState,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        backgroundColor = if (isDarkMode) DarkSurface else LightSurface,
+                        contentColor = BrandBlue
+                    )
                 }
             }
 
@@ -308,23 +296,6 @@ fun AssetOverviewScreen(
             }
         }
 
-        // 下拉刷新指示器，简化实现以避免错位和闪烁
-        if (isIndicatorVisible) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = topBarHeight)
-            ) {
-                PullRefreshIndicator(
-                    refreshing = isRefreshing,
-                    state = pullRefreshState,
-                    modifier = Modifier,
-                    backgroundColor = if (isDarkMode) DarkSurface else LightSurface,
-                    contentColor = BrandBlue
-                )
-            }
-        }
-
     }
 }
 
@@ -340,15 +311,27 @@ fun SummaryCard(
     val coroutineScope = rememberCoroutineScope()
 
     val handleRecordClick = fun() {
+        if (isRecording) return
         isRecording = true
         onRecordNav()
-        showSuccess = true
-        
-        // 3秒后恢复按钮状态
-        coroutineScope.launch {
-            delay(3000)
-            showSuccess = false
-            isRecording = false
+    }
+
+    // 监听记录结果事件
+    LaunchedEffect(Unit) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                is UiEvent.RecordSuccess -> {
+                    showSuccess = true
+                    coroutineScope.launch {
+                        delay(3000)
+                        showSuccess = false
+                        isRecording = false
+                    }
+                }
+                is UiEvent.ShowSnackbar -> {
+                    isRecording = false
+                }
+            }
         }
     }
 
@@ -486,16 +469,9 @@ fun SummaryItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        val textStyle = when {
-            value.length > 15 -> MaterialTheme.typography.titleSmall
-            value.length > 12 -> MaterialTheme.typography.titleMedium
-            value.length > 9 -> MaterialTheme.typography.titleLarge
-            else -> MaterialTheme.typography.headlineSmall
-        }
-
         Text(
             text = value,
-            style = textStyle,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = color,
             maxLines = 1,
@@ -806,9 +782,9 @@ fun FundListItem(
     viewModel: AssetOverviewViewModel,
     onClick: () -> Unit
 ) {
-    val currentValue = fund.holdingQuantity * fund.currentPrice
+    val currentValue = HoldingsCalculator.calculateCurrentValue(fund)
     val currentRatio = viewModel.getFundDisplayRatio(fund, totalAssets)
-    val (_, _) = RebalanceCalculator.calculateDeviation(fund, totalAssets)
+    val (_, _) = HoldingsCalculator.calculateDeviation(fund, totalAssets)
     val status = viewModel.getFundStatus(fund, totalAssets)
 
     val statusColor = when (status) {

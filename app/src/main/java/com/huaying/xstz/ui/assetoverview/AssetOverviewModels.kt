@@ -66,22 +66,26 @@ data class TrendChartData(
 // ==================== 趋势图缓存 ====================
 
 object TrendChartDataCache {
-    private val cache = java.util.concurrent.ConcurrentHashMap<String, TrendChartData>()
+    private val cache = object : LinkedHashMap<String, TrendChartData>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, TrendChartData>): Boolean {
+            return size > MAX_CACHE_SIZE
+        }
+    }
     private const val MAX_CACHE_SIZE = 10
 
     fun generateKey(timeRange: TimeRange, dataType: ChartDataType, records: List<com.huaying.xstz.data.entity.NetValueRecord>): String {
         return "${timeRange.name}_${dataType.name}_${records.size}_${records.firstOrNull()?.createdAt ?: 0}"
     }
 
+    @Synchronized
     fun get(key: String): TrendChartData? = cache[key]
 
+    @Synchronized
     fun put(key: String, data: TrendChartData) {
-        if (cache.size >= MAX_CACHE_SIZE) {
-            cache.keys.firstOrNull()?.let { cache.remove(it) }
-        }
         cache[key] = data
     }
 
+    @Synchronized
     fun clear() = cache.clear()
 }
 

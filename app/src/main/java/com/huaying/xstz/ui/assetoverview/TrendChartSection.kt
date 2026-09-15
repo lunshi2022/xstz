@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
@@ -36,7 +37,13 @@ import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
+import com.github.mikephil.charting.highlight.Highlight
+import com.github.mikephil.charting.utils.MPPointF
+import com.huaying.xstz.R
 import com.huaying.xstz.ui.theme.BrandBlue
+import android.widget.TextView
+import android.os.Handler
+import android.os.Looper
 import java.text.DecimalFormat
 
 @Composable
@@ -184,15 +191,23 @@ fun TrendLineChart(
     val lineColor = BrandBlue
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f).toArgb()
+    val context = LocalContext.current
+
+    val marker = remember(context, dataType) {
+        TrendMarkerView(context, R.layout.marker_view, dataType)
+    }
 
     AndroidView(
-        factory = { context ->
-            LineChart(context).apply {
+        factory = { ctx ->
+            LineChart(ctx).apply {
                 setupChart(this, lineColor, textColor, gridColor)
+                this.marker = marker
+                marker.chartView = this
             }
         },
         update = { chart ->
             chartData?.let { data ->
+                marker.setData(data)
                 updateChartData(chart, data, lineColor)
             }
         },
@@ -292,5 +307,63 @@ private fun updateChartData(
     if (data.dataPoints.size > 1) {
         chart.setVisibleXRangeMaximum(data.dataPoints.size.toFloat())
         chart.moveViewToX(data.dataPoints.lastIndex.toFloat())
+    }
+}
+
+/**
+ * 资产总览趋势图的 Marker 浮窗
+ */
+private class TrendMarkerView(
+    context: android.content.Context,
+    layoutResource: Int,
+    private val dataType: ChartDataType
+) : com.github.mikephil.charting.components.MarkerView(context, layoutResource) {
+
+    private val tvContent: TextView = findViewById(R.id.tvContent)
+    private var chartData: TrendChartData? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var hideRunnable: Runnable? = null
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        hideRunnable?.let { handler.removeCallbacks(it) }
+        hideRunnable = null
+    }
+
+    fun setData(data: TrendChartData) {
+        this.chartData = data
+    }
+
+    override fun refreshContent(e: Entry?, highlight: Highlight?) {
+        if (e == null) return
+
+        val data = chartData
+        val index = e.x.toInt()
+        val point = data?.dataPoints?.getOrNull(index)
+
+        val text = if (point != null) {
+            val valueText = when (dataType) {
+                ChartDataType.RETURN_RATE -> "%.2f%%".format(e.y)
+                ChartDataType.ASSET_RATIO -> "%.1f%%".format(e.y)
+                ChartDataType.ASSET_COMPARISON -> "%,.2f".format(e.y)
+            }
+            "${point.label}\n$valueText"
+        } else {
+            "%.2f".format(e.y)
+        }
+
+        tvContent.text = text
+
+        hideRunnable?.let { handler.removeCallbacks(it) }
+        hideRunnable = Runnable {
+            chartView?.highlightValue(null)
+        }
+        handler.postDelayed(hideRunnable!!, 2000)
+
+        super.refreshContent(e, highlight)
+    }
+
+    override fun getOffset(): MPPointF {
+        return MPPointF(-(width / 2f), -height.toFloat() - 10f)
     }
 }

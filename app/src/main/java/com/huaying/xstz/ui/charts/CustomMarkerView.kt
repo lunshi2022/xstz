@@ -10,33 +10,40 @@ import com.github.mikephil.charting.highlight.Highlight
 import com.github.mikephil.charting.utils.MPPointF
 import com.huaying.xstz.R
 import com.huaying.xstz.data.model.DailyAssetData
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter
 
 class CustomMarkerView(context: Context, layoutResource: Int) : MarkerView(context, layoutResource) {
 
     private val tvContent: TextView = findViewById(R.id.tvContent)
     private var dataList: List<DailyAssetData>? = null
-    private var type: String = "value" 
+    private var type: String = "value"
     private val handler = Handler(Looper.getMainLooper())
     private var hideRunnable: Runnable? = null
+
+    // 使用 View 的生命周期来清理 Handler 回调，避免内存泄漏
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        hideRunnable?.let { handler.removeCallbacks(it) }
+        hideRunnable = null
+    }
 
     fun setData(data: List<DailyAssetData>) {
         this.dataList = data
     }
-    
+
     fun setChartType(type: String) {
         this.type = type
     }
 
     override fun refreshContent(e: Entry?, highlight: Highlight?) {
         if (e == null) return
-        
+
         try {
             val index = e.x.toInt()
             if (dataList != null && index >= 0 && index < dataList!!.size) {
                 val item = dataList!![index]
-                val dateStr = item.date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                
+                val dateStr = item.date.format(DATE_FORMATTER)
+
                 val valueText = when (type) {
                     "return" -> "收益率: %.2f%%".format(e.y)
                     "percent" -> {
@@ -61,7 +68,7 @@ class CustomMarkerView(context: Context, layoutResource: Int) : MarkerView(conte
                         val principal = item.principal
                         val profit = total - principal
                         val profitRate = if (principal > 0) profit / principal * 100 else 0.0
-                        
+
                         buildString {
                             append("总资产: %.2f".format(total))
                             if (principal > 0) {
@@ -72,45 +79,42 @@ class CustomMarkerView(context: Context, layoutResource: Int) : MarkerView(conte
                     }
                     else -> "数值: %.2f".format(e.y)
                 }
-                
+
                 tvContent.text = "$dateStr\n$valueText"
             } else {
-                 tvContent.text = "%.2f".format(e.y)
+                tvContent.text = "%.2f".format(e.y)
             }
         } catch (ex: Exception) {
-             tvContent.text = "%.2f".format(e.y)
+            tvContent.text = "%.2f".format(e.y)
         }
 
-        // 取消之前的隐藏任务
-        hideRunnable?.let { handler.removeCallbacks(it) }
-        
-        // 设置2秒后自动隐藏
-        hideRunnable = Runnable {
-            if (chartView != null) {
-                chartView.highlightValue(null)
-            }
-        }
-        handler.postDelayed(hideRunnable!!, 2000) // 2秒后自动隐藏
+        scheduleAutoHide()
 
         super.refreshContent(e, highlight)
     }
 
     // 重置自动隐藏计时器
     fun resetAutoHideTimer() {
-        // 取消之前的隐藏任务
+        scheduleAutoHide()
+    }
+
+    private fun scheduleAutoHide() {
         hideRunnable?.let { handler.removeCallbacks(it) }
-        
-        // 重新设置2秒后自动隐藏
+
         hideRunnable = Runnable {
             if (chartView != null) {
                 chartView.highlightValue(null)
             }
         }
-        handler.postDelayed(hideRunnable!!, 2000) // 2秒后自动隐藏
+        handler.postDelayed(hideRunnable!!, AUTO_HIDE_DELAY_MS)
     }
 
     override fun getOffset(): MPPointF {
-        // Center the marker horizontally, and place it above the value
         return MPPointF(-(width / 2f), -height.toFloat() - 10f)
+    }
+
+    companion object {
+        private const val AUTO_HIDE_DELAY_MS = 2000L
+        private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     }
 }

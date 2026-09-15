@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import androidx.core.content.FileProvider
 import java.io.File
@@ -63,15 +62,11 @@ class DownloadUtil(private val context: Context) {
                     val file = File(downloadDir, fileName)
                     
                     if (file.exists()) {
-                        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                            FileProvider.getUriForFile(
-                                context!!,
-                                "${context.packageName}.fileprovider",
-                                file
-                            )
-                        } else {
-                            Uri.fromFile(file)
-                        }
+                        val uri = FileProvider.getUriForFile(
+                            context!!,
+                            "${context.packageName}.fileprovider",
+                            file
+                        )
                         onComplete(uri)
                     }
                     context?.unregisterReceiver(this)

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.huaying.xstz.data.AppDatabase
 import com.huaying.xstz.data.PreferenceManager
+import com.huaying.xstz.data.network.TencentFundNetworkService
 import com.huaying.xstz.data.repository.FundRepository
 import com.huaying.xstz.data.repository.OperationLogRepository
 import com.huaying.xstz.data.repository.OperationLogger
@@ -54,7 +55,7 @@ suspend fun initializeApp(
         val database = AppDatabase.getDatabase(context)
         StartupTracer.markMilestone("database_ready")
 
-        val repository = FundRepository(database)
+        val repository = FundRepository(database, TencentFundNetworkService())
         val operationLogRepository = OperationLogRepository(database)
         StartupTracer.markMilestone("repository_ready")
 

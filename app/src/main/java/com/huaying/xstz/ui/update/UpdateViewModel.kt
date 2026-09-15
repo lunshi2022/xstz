@@ -6,10 +6,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.huaying.xstz.data.PreferenceManager
 import com.huaying.xstz.data.model.UpdateInfo
 import com.huaying.xstz.data.repository.UpdateRepository
 import com.huaying.xstz.util.DownloadUtil
 import com.huaying.xstz.util.InstallUtil
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -20,6 +22,15 @@ class UpdateViewModel(context: Context) : ViewModel() {
     private val repository = UpdateRepository(context)
     private val downloadUtil = DownloadUtil(context)
     private val appContext = context.applicationContext
+    private val preferenceManager = PreferenceManager(context)
+
+    // 当前版本名
+    val currentVersionName: String = try {
+        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        packageInfo.versionName ?: ""
+    } catch (e: Exception) {
+        ""
+    }
 
     // 是否显示更新对话框
     var showUpdateDialog by mutableStateOf(false)
@@ -44,10 +55,16 @@ class UpdateViewModel(context: Context) : ViewModel() {
     // 错误信息
     var errorMessage by mutableStateOf("")
         private set
+
+    // 是否正在下载
+    var isDownloading by mutableStateOf(false)
+        private set
+
     // GitHub 配置
     companion object {
         const val GITHUB_OWNER = "lunshi2022"  // GitHub 用户名
         const val GITHUB_REPO = "xstz"         // 仓库名
+        private const val DISMISS_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000L // 3天冷却期
     }
 
     /**
@@ -56,6 +73,14 @@ class UpdateViewModel(context: Context) : ViewModel() {
      */
     fun checkForUpdate(showNoUpdate: Boolean = false) {
         viewModelScope.launch {
+            // 自动检查时，如果在冷却期内则跳过
+            if (!showNoUpdate) {
+                val lastDismissed = preferenceManager.lastUpdateDismissed.first()
+                if (lastDismissed > 0 && System.currentTimeMillis() - lastDismissed < DISMISS_COOLDOWN_MS) {
+                    return@launch
+                }
+            }
+
             showCheckingDialog = true
             val result = repository.checkForUpdate(GITHUB_OWNER, GITHUB_REPO)
             showCheckingDialog = false
@@ -81,9 +106,11 @@ class UpdateViewModel(context: Context) : ViewModel() {
      */
     fun downloadAndInstallUpdate() {
         updateInfo?.let { info ->
+            isDownloading = true
             val fileName = "xstz-update-${info.versionName}.apk"
             val downloadId = downloadUtil.downloadApk(info.downloadUrl, fileName)
             downloadUtil.registerDownloadCompleteListener(downloadId, fileName) { uri ->
+                isDownloading = false
                 InstallUtil.installApk(appContext, uri)
             }
             dismissUpdateDialog()
@@ -91,10 +118,13 @@ class UpdateViewModel(context: Context) : ViewModel() {
     }
 
     /**
-     * 关闭更新对话框
+     * 关闭更新对话框（记录冷却时间）
      */
     fun dismissUpdateDialog() {
         showUpdateDialog = false
+        viewModelScope.launch {
+            preferenceManager.setLastUpdateDismissed(System.currentTimeMillis())
+        }
     }
 
     /**

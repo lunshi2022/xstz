@@ -9,6 +9,7 @@ import com.huaying.xstz.data.entity.Fund
 import com.huaying.xstz.data.entity.OperationType
 import com.huaying.xstz.data.entity.Transaction
 import com.huaying.xstz.data.entity.TransactionType
+import com.huaying.xstz.data.network.FundNetworkService
 import com.huaying.xstz.data.repository.FundRepository
 import com.huaying.xstz.data.repository.OperationLogRepository
 import com.huaying.xstz.data.repository.TimeRepository
@@ -34,7 +35,7 @@ sealed interface AddFundUiState {
         val marketValue: TextFieldValue = TextFieldValue(""),
         val costPrice: TextFieldValue = TextFieldValue(""),
         val isLoading: Boolean = false,
-        val queryResult: FundRepository.FundQueryResult? = null
+        val queryResult: FundNetworkService.FundQueryResult? = null
     ) : AddFundUiState
 }
 

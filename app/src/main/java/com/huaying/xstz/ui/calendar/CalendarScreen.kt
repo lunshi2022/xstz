@@ -15,7 +15,7 @@ import com.huaying.xstz.data.model.DailyAssetData
 import com.huaying.xstz.data.repository.FundRepository
 import com.huaying.xstz.data.repository.OperationLogger
 import kotlinx.coroutines.flow.collectLatest
-import org.threeten.bp.LocalDate
+import java.time.LocalDate
 
 /**
  * 日历屏幕
@@ -30,6 +30,7 @@ fun CalendarScreen(
     var dailyData by remember { mutableStateOf<List<DailyAssetData>>(emptyList()) }
     var holidays by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
     var workdays by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
+    var holidayNames by remember { mutableStateOf<Map<LocalDate, String>>(emptyMap()) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     var selectedData by remember { mutableStateOf<DailyAssetData?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -45,6 +46,15 @@ fun CalendarScreen(
         val year = LocalDate.now().year
         holidays = com.huaying.xstz.data.repository.HolidayRepository.getBuiltinHolidaysForCalendar(year)
         workdays = com.huaying.xstz.data.repository.HolidayRepository.getBuiltinWorkdaysForCalendar(year)
+
+        // 加载节日名称
+        val (hDates, hNames) = com.huaying.xstz.ui.assetoverview.HolidayDateProvider.getHolidayDatesForCurrentYear()
+        val localDateHolidayNames = hNames.mapKeys { (timestamp, _) ->
+            java.time.Instant.ofEpochMilli(timestamp)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDate()
+        }
+        holidayNames = localDateHolidayNames
 
         // 加载资产数据
         repository.getDailyAssetDataFlow().collectLatest { data ->
@@ -106,6 +116,7 @@ fun CalendarScreen(
                             data = dailyData,
                             holidays = holidays,
                             workdays = workdays,
+                            holidayNames = holidayNames,
                             onDateSelected = { date, data ->
                                 selectedDate = date
                                 selectedData = data

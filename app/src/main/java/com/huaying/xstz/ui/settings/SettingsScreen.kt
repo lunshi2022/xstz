@@ -137,10 +137,10 @@ fun SettingsScreen(
 
                 var showRefreshInfoDialog by remember { mutableStateOf(false) }
 
-                DropdownSettingItem(
+                SegmentedButtonSettingItem(
                     title = "行情刷新频率",
-                    currentValue = refreshOptions[currentRefreshIndex],
                     options = refreshOptions,
+                    selectedIndex = currentRefreshIndex,
                     onOptionSelected = { index ->
                         scope.launch {
                             val oldValue = refreshOptions[currentRefreshIndex]
@@ -148,7 +148,7 @@ fun SettingsScreen(
                             when (index) {
                                 0 -> { // Smart
                                     preferenceManager.setRefreshMode(0)
-                                    preferenceManager.setRefreshIntervalSeconds(1) // Default interval for smart (1s)
+                                    preferenceManager.setRefreshIntervalSeconds(1)
                                 }
                                 1 -> { // 3s Fixed
                                     preferenceManager.setRefreshMode(1)
@@ -203,10 +203,10 @@ fun SettingsScreen(
                     else -> 0
                 }
                 
-                DropdownSettingItem(
+                SegmentedButtonSettingItem(
                     title = "深色模式",
-                    currentValue = themeOptions[currentThemeIndex],
                     options = themeOptions,
+                    selectedIndex = currentThemeIndex,
                     onOptionSelected = { index ->
                         scope.launch {
                             val oldValue = themeOptions[currentThemeIndex]
@@ -334,6 +334,66 @@ fun SettingsScreen(
     }
 
     // 主题模式选择对话框 (已移除，改为 DropdownSettingItem)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SegmentedButtonSettingItem(
+    title: String,
+    options: List<String>,
+    selectedIndex: Int,
+    onOptionSelected: (Int) -> Unit,
+    onInfoClick: (() -> Unit)? = null
+) {
+    val textPrimaryColor = MaterialTheme.colorScheme.onSurface
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                title,
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+                color = textPrimaryColor
+            )
+            if (onInfoClick != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "说明",
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onInfoClick() },
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            options.forEachIndexed { index, option ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                    onClick = { onOptionSelected(index) },
+                    selected = index == selectedIndex,
+                    label = {
+                        Text(
+                            option,
+                            fontSize = 14.sp,
+                            fontWeight = if (index == selectedIndex) FontWeight.Medium else FontWeight.Normal
+                        )
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable

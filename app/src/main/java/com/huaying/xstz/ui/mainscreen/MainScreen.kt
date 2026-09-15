@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.layout.*
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +30,8 @@ import com.huaying.xstz.data.repository.TimeRepository
 import com.huaying.xstz.ui.addfund.AddFundScreen
 import com.huaying.xstz.ui.animation.AnimationConstants
 import com.huaying.xstz.ui.animation.navigation.NavigationAnimations
+import com.huaying.xstz.ui.assetdetail.AssetDetailViewModel
+import com.huaying.xstz.ui.assetdetail.AssetDetailUiState
 import com.huaying.xstz.ui.navigation.Route
 import com.huaying.xstz.ui.navigation.NavigationDirection
 import com.huaying.xstz.ui.navigation.getNavigationDirection
@@ -76,7 +79,8 @@ fun MainScreen(
     darkTheme: Boolean,
     exportLauncher: androidx.activity.result.ActivityResultLauncher<String>,
     importLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    autoUpdateViewModel: UpdateViewModel? = null
 ) {
     val context = LocalContext.current
     val navController = rememberNavController()
@@ -103,8 +107,8 @@ fun MainScreen(
         }
     }
 
-    // 更新检查 ViewModel
-    val updateViewModel = remember { UpdateViewModel(context) }
+    // 更新检查 ViewModel（优先使用外部传入的，用于自动更新检查）
+    val updateViewModel = autoUpdateViewModel ?: remember { UpdateViewModel(context) }
 
     // 预加载基金数据，供所有页面共享使用
     val allFunds by repository.getAllFunds().collectAsState(initial = emptyList())
@@ -113,9 +117,6 @@ fun MainScreen(
     // 预加载操作日志数据
     val allOperationLogs by operationLogRepository.getAllOperationLogs().collectAsState(initial = emptyList())
     val operationLogCount by operationLogRepository.getOperationLogCount().collectAsState(initial = 0)
-    val totalMarketValue by remember(allFunds) {
-        derivedStateOf { allFunds.sumOf { it.holdingQuantity * it.currentPrice } }
-    }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditCostDialog by remember { mutableStateOf(false) }
@@ -125,59 +126,7 @@ fun MainScreen(
     // 使用 Scaffold 标准布局
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
-        bottomBar = {
-            val bottomBarOffset by animateFloatAsState(
-                targetValue = if (showBottomBar) 0f else 1f,
-                animationSpec = tween(AnimationConstants.Duration.NORMAL, easing = AnimationConstants.Easing.Decelerate),
-                label = "bottomBarOffset"
-            )
-            val bottomBarAlpha by animateFloatAsState(
-                targetValue = if (showBottomBar) 1f else 0f,
-                animationSpec = tween(AnimationConstants.Duration.NORMAL),
-                label = "bottomBarAlpha"
-            )
-            CustomBottomNavigationBar(
-                currentRoute = currentRoute,
-                onNavigate = { route ->
-                        // 防抖：动画期间忽略重复点击
-                        val now = System.currentTimeMillis()
-                        if (now - lastTabSwitchTime < tabSwitchCooldown) return@CustomBottomNavigationBar
-                        lastTabSwitchTime = now
-
-                        // 记录导航切换
-                        val fromPage = when (currentRoute) {
-                            Route.HOME -> "资产概览"
-                            Route.CHARTS -> "图表分析"
-                            Route.REBALANCE -> "再平衡"
-                            Route.SETTINGS -> "设置"
-                            else -> currentRoute
-                        }
-                        val toPage = when (route) {
-                            Route.HOME -> "资产概览"
-                            Route.CHARTS -> "图表分析"
-                            Route.REBALANCE -> "再平衡"
-                            Route.SETTINGS -> "设置"
-                            else -> route
-                        }
-                        if (fromPage != toPage) {
-                            OperationLogger.logNavigationSwitch(fromPage, toPage)
-                        }
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onAddClick = {
-                        OperationLogger.logButtonClick("添加基金", "底部导航")
-                        navController.navigate(Route.ADD_FUND)
-                    },
-                    darkTheme = darkTheme,
-                exitOffsetFraction = bottomBarOffset,
-                exitAlpha = bottomBarAlpha
-            )
-        }
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp)
     ) { innerPadding ->
         val contentModifier = Modifier
             .fillMaxSize()
@@ -188,9 +137,18 @@ fun MainScreen(
             )
             .consumeWindowInsets(innerPadding)
 
-        // 始终渲染 NavHost，确保 navController.graph 始终可用
-        // Tab 路由渲染空占位（实际内容由 AnimatedContent 叠加层显示）
-        // 子页面渲染实际内容并使用 push/pop 动画
+        // 底部导航栏的 offset/alpha 动画
+        val bottomBarOffset by animateFloatAsState(
+            targetValue = if (showBottomBar) 0f else 1f,
+            animationSpec = tween(AnimationConstants.Duration.NORMAL, easing = AnimationConstants.Easing.Decelerate),
+            label = "bottomBarOffset"
+        )
+        val bottomBarAlpha by animateFloatAsState(
+            targetValue = if (showBottomBar) 1f else 0f,
+            animationSpec = tween(AnimationConstants.Duration.NORMAL),
+            label = "bottomBarAlpha"
+        )
+
         Box(modifier = contentModifier) {
             NavHost(
                 navController = navController,
@@ -272,8 +230,17 @@ fun MainScreen(
                     popExitTransition = { NavigationAnimations.popExit()(this) }
                 ) { backStackEntry ->
                     val fundId = backStackEntry.arguments?.getLong("fundId") ?: 0L
-                    val fund = allFunds.find { it.id == fundId }
-                    val transactions = allTransactions.filter { it.fundId == fundId }
+                    val assetDetailViewModel: AssetDetailViewModel = hiltViewModel()
+                    val assetDetailState by assetDetailViewModel.uiState.collectAsState()
+
+                    LaunchedEffect(fundId) {
+                        assetDetailViewModel.loadFund(fundId)
+                    }
+
+                    val fund = (assetDetailState as? AssetDetailUiState.Success)?.fund
+                        ?: allFunds.find { it.id == fundId }
+                    val transactions = (assetDetailState as? AssetDetailUiState.Success)?.transactions
+                        ?: allTransactions.filter { it.fundId == fundId }
                     val totalTargetRatio = allFunds.sumOf { if (it.targetRatio.isNaN()) 0.0 else it.targetRatio }
 
                     if (fund != null) {
@@ -375,24 +342,68 @@ fun MainScreen(
                             onDismiss = { showEditQuantityDialog = false },
                             onConfirm = { q, p ->
                                 scope.launch {
-                                    val delta = q - currentFund.holdingQuantity
-                                    val tPrice = p ?: currentFund.currentPrice
-                                    val newCost = if (delta > 0) currentFund.totalCost + (delta * tPrice) else (if (currentFund.holdingQuantity > 0) currentFund.totalCost * (q / currentFund.holdingQuantity) else 0.0)
-                                    val up = currentFund.copy(holdingQuantity = if (q < 0) 0.0 else q, totalCost = newCost, updatedAt = TimeRepository.getCurrentTimeMillis())
+                                    val isCash = currentFund.type == com.huaying.xstz.data.entity.AssetType.CASH
+                                    val newQuantity: Double
+                                    val delta: Double
+                                    val tPrice: Double
+                                    val newCost: Double
+
+                                    if (isCash) {
+                                        // 现金：q 是变动金额（正数存入，负数取出）
+                                        delta = q
+                                        newQuantity = (currentFund.holdingQuantity + q).coerceAtLeast(0.0)
+                                        tPrice = 1.0
+                                        newCost = if (delta > 0) {
+                                            currentFund.totalCost + delta
+                                        } else {
+                                            if (currentFund.holdingQuantity > 0) {
+                                                currentFund.totalCost * (newQuantity / currentFund.holdingQuantity)
+                                            } else 0.0
+                                        }
+                                    } else {
+                                        // 非现金：q 是新持仓份额
+                                        delta = q - currentFund.holdingQuantity
+                                        tPrice = p ?: currentFund.currentPrice
+                                        newQuantity = if (q < 0) 0.0 else q
+                                        newCost = if (delta > 0) {
+                                            currentFund.totalCost + (delta * tPrice)
+                                        } else {
+                                            if (currentFund.holdingQuantity > 0) {
+                                                currentFund.totalCost * (q / currentFund.holdingQuantity)
+                                            } else 0.0
+                                        }
+                                    }
+
+                                    val up = currentFund.copy(holdingQuantity = newQuantity, totalCost = newCost, updatedAt = TimeRepository.getCurrentTimeMillis())
                                     repository.updateFund(up)
                                     if (abs(delta) > 0.001) {
-                                        repository.insertTransaction(Transaction(
-                                            fundId = currentFund.id, fundCode = currentFund.code, fundName = currentFund.name,
-                                            type = if (delta > 0) TransactionType.BUY else TransactionType.SELL,
-                                            amount = -(delta * tPrice), price = tPrice, quantity = abs(delta), remark = "手动调整"
-                                        ))
-                                        operationLogRepository.logOperation(
-                                            type = OperationType.EDIT_HOLDING,
-                                            title = if (delta > 0) "增加持仓" else "减少持仓",
-                                            description = "基金: ${currentFund.code}, 变动: ${String.format("%.2f", abs(delta))}份",
-                                            targetId = currentFund.id,
-                                            targetName = currentFund.name
-                                        )
+                                        if (isCash) {
+                                            repository.insertTransaction(Transaction(
+                                                fundId = currentFund.id, fundCode = currentFund.code, fundName = currentFund.name,
+                                                type = if (delta > 0) com.huaying.xstz.data.entity.TransactionType.ADD_FUNDS else com.huaying.xstz.data.entity.TransactionType.WITHDRAW,
+                                                amount = -delta, price = 1.0, quantity = abs(delta), remark = if (delta > 0) "存入" else "取出"
+                                            ))
+                                            operationLogRepository.logOperation(
+                                                type = if (delta > 0) com.huaying.xstz.data.entity.OperationType.ADD_CASH else com.huaying.xstz.data.entity.OperationType.WITHDRAW_CASH,
+                                                title = if (delta > 0) "存入资金" else "取出资金",
+                                                description = "基金: ${currentFund.code}, 金额: ¥${String.format("%.2f", abs(delta))}",
+                                                targetId = currentFund.id,
+                                                targetName = currentFund.name
+                                            )
+                                        } else {
+                                            repository.insertTransaction(Transaction(
+                                                fundId = currentFund.id, fundCode = currentFund.code, fundName = currentFund.name,
+                                                type = if (delta > 0) com.huaying.xstz.data.entity.TransactionType.BUY else com.huaying.xstz.data.entity.TransactionType.SELL,
+                                                amount = -(delta * tPrice), price = tPrice, quantity = abs(delta), remark = "手动调整"
+                                            ))
+                                            operationLogRepository.logOperation(
+                                                type = com.huaying.xstz.data.entity.OperationType.EDIT_HOLDING,
+                                                title = if (delta > 0) "增加持仓" else "减少持仓",
+                                                description = "基金: ${currentFund.code}, 变动: ${String.format("%.2f", abs(delta))}份",
+                                                targetId = currentFund.id,
+                                                targetName = currentFund.name
+                                            )
+                                        }
                                     }
                                     showEditQuantityDialog = false
                                 }
@@ -556,6 +567,49 @@ fun MainScreen(
                     }
                 }
             }
+
+            // 底部导航栏作为 overlay，隐藏时不拦截触摸事件
+            CustomBottomNavigationBar(
+                currentRoute = currentTabRoute,
+                onNavigate = { route ->
+                    // 防抖：动画期间忽略重复点击
+                    val now = System.currentTimeMillis()
+                    if (now - lastTabSwitchTime < tabSwitchCooldown) return@CustomBottomNavigationBar
+                    lastTabSwitchTime = now
+
+                    // 记录导航切换
+                    val fromPage = when (currentTabRoute) {
+                        Route.HOME -> "资产概览"
+                        Route.CHARTS -> "图表分析"
+                        Route.REBALANCE -> "再平衡"
+                        Route.SETTINGS -> "设置"
+                        else -> currentTabRoute
+                    }
+                    val toPage = when (route) {
+                        Route.HOME -> "资产概览"
+                        Route.CHARTS -> "图表分析"
+                        Route.REBALANCE -> "再平衡"
+                        Route.SETTINGS -> "设置"
+                        else -> route
+                    }
+                    if (fromPage != toPage) {
+                        OperationLogger.logNavigationSwitch(fromPage, toPage)
+                    }
+                    navController.navigate(route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                onAddClick = {
+                    OperationLogger.logButtonClick("添加基金", "底部导航")
+                    navController.navigate(Route.ADD_FUND)
+                },
+                darkTheme = darkTheme,
+                exitOffsetFraction = bottomBarOffset,
+                exitAlpha = bottomBarAlpha,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
 
         // 更新对话框
@@ -566,6 +620,7 @@ fun MainScreen(
         if (updateViewModel.showUpdateDialog && updateViewModel.updateInfo != null) {
             UpdateDialog(
                 updateInfo = updateViewModel.updateInfo!!,
+                currentVersionName = updateViewModel.currentVersionName,
                 onDismiss = { updateViewModel.dismissUpdateDialog() },
                 onConfirm = { updateViewModel.downloadAndInstallUpdate() }
             )

@@ -2,7 +2,7 @@
 
 > 项目：InvestmentManager（Android 投资管理应用）
 > 初始化日期：2026-06-06
-> 最近更新：2026-06-09
+> 最近更新：2026-09-15
 > 语言：中文
 
 ---
@@ -12,9 +12,10 @@
 后续 AI agent 接手本项目时，按以下顺序阅读：
 
 1. **本文件（AGENTS.md）** — 项目级执行规则与协作基线
-2. **`prototype/code.html`** — 原型设计稿，理解 UI 交互意图
-3. **`app/build.gradle.kts`** — 依赖版本与构建配置
-4. **`app/src/main/AndroidManifest.xml`** — 权限与组件声明
+2. **`README.md`** — 项目功能概览、技术栈与构建说明（用户可见文档）
+3. **`prototype/code.html`** — 原型设计稿，理解 UI 交互意图
+4. **`app/build.gradle.kts`** — 依赖版本与构建配置
+5. **`app/src/main/AndroidManifest.xml`** — 权限与组件声明
 
 ---
 
@@ -31,12 +32,15 @@
 | 项目根目录 | `d:\LeStoreSoftstore\Install\Android_Projram\Project\20260205124830` | 单仓库，无嵌套子仓库 |
 | 主代码模块 | `app/` | 唯一 Android 应用模块 |
 | Gradle 包装器 | `gradle/wrapper/` | 使用 `gradlew.bat` 构建 |
+| 项目文档 | `README.md`、`AGENTS.md` | README 面向用户，AGENTS.md 约束 AI 协作 |
+| 设计工件 | `.design/` | 设计令牌与图标资产（colors_and_type.css、components.css、SVG 图标），由 solo-design 流程产出，非构建产物 |
 | 原型/设计稿 | `prototype/` | 包含 `code.html` 与 `screen.png`，非构建产物 |
 | 许可证 | `LICENSE` | MIT License，版权所有 2026 lunshi2022 |
 
 - **Git 状态**：已初始化 Git 仓库，`.git` 位于项目根目录。
 - **项目类型**：`single-repo`（单仓库 Android 项目）
-- **应用版本**：versionName `1.6.0`，versionCode `160`
+- **应用版本**：versionName `1.6.5-Beta`，versionCode `166`
+- **工作区状态**：本地存在大量未提交改动（v1.6.0 提交后演进至 1.6.5-Beta），改动代码前先确认工作区基线。
 
 ---
 
@@ -58,7 +62,7 @@
 | Kotlin | 1.9.22 |
 | KSP | 1.9.22-1.0.17 |
 | Compile SDK | 34 |
-| Min SDK | 24 |
+| Min SDK | 34（Android 14） |
 | Target SDK | 34 |
 | Java / JVM Target | 21 |
 | Compose BOM | 2024.02.00 |
@@ -75,16 +79,17 @@ app/src/main/java/com/huaying/xstz/
 ├── core/init/           # 应用初始化（AppInitializer.kt）
 ├── data/
 │   ├── api/             # Retrofit 网络接口（GitHubApi.kt）
-│   ├── converter/       # Room 类型转换器
+│   ├── converter/       # Room 类型转换器（AssetTypeConverter、EncryptedDoubleConverter）
 │   ├── dao/             # Room 数据访问对象
 │   ├── entity/          # Room 实体类
 │   ├── model/           # 业务数据模型
-│   ├── repository/      # 仓库层（数据操作、日志、时间、更新检查）
+│   ├── network/         # 网络服务接口层（FundNetworkService 接口 + TencentFundNetworkService 实现）
+│   ├── repository/      # 仓库层（数据操作、日志、时间、节假日、更新检查）
 │   ├── security/        # 加密管理（CryptoManager.kt）
-│   ├── AppDatabase.kt   # Room 数据库入口
+│   ├── AppDatabase.kt   # Room 数据库入口（当前版本 v6）
 │   ├── PreferenceManager.kt # DataStore 偏好设置
 │   └── ThemeMode.kt     # 主题模式枚举（AUTO/LIGHT/DARK）
-├── di/                  # Hilt 依赖注入模块（AppModule.kt）
+├── di/                  # Hilt 依赖注入模块（AppModule.kt，含 FundNetworkService 绑定）
 ├── ui/                  # Jetpack Compose UI 层
 │   ├── addfund/         # 添加基金
 │   ├── animation/       # 动画常量与工具
@@ -106,9 +111,22 @@ app/src/main/java/com/huaying/xstz/
 │   ├── targetallocation/# 目标仓位
 │   ├── theme/           # 主题、颜色、字体
 │   └── update/          # 更新对话框
-├── util/                # 工具类（下载、安装、SNTP、性能追踪）
+├── util/                # 工具类
+│   ├── performance/     # 性能追踪（StartupTracer.kt）
+│   ├── AppConstants.kt  # 应用常量（含 MIN_ABS_DEVIATION 等）
+│   ├── DownloadUtil.kt  # 下载工具
+│   ├── FormatTemplates.kt # 格式化模板
+│   ├── FormatUtils.kt   # 格式化工具
+│   ├── HoldingsCalculator.kt # 持仓计算器
+│   ├── InstallUtil.kt   # 安装工具
+│   └── SntpClient.kt    # SNTP 时间同步
 ├── InvestmentApp.kt     # Application 类（@HiltAndroidApp）
 └── MainActivity.kt      # 主 Activity（Compose 入口）
+
+app/src/test/java/com/huaying/xstz/
+└── util/                # 单元测试
+    ├── FormatUtilsTest.kt      # 格式化工具测试
+    └── HoldingsCalculatorTest.kt # 持仓计算器测试
 ```
 
 ---
@@ -127,6 +145,10 @@ app/src/main/java/com/huaying/xstz/
   ```powershell
   $env:JAVA_HOME="D:\LeStoreSoftstore\Install\Android_Projram\Studio\jbr"; .\gradlew.bat clean
   ```
+- **单元测试**：
+  ```powershell
+  $env:JAVA_HOME="D:\LeStoreSoftstore\Install\Android_Projram\Studio\jbr"; .\gradlew.bat testDebugUnitTest
+  ```
 - **JAVA_HOME**：`D:\LeStoreSoftstore\Install\Android_Projram\Studio\jbr`（Android Studio 内置 JBR，OpenJDK 21.0.10）。系统环境变量 `JAVA_HOME` 指向了不存在的路径，构建时需显式设置。
 - **Gradle 配置**：`gradle.properties` 中已启用并行构建、配置按需、缓存，并指定了本地 Maven 仓库镜像路径 `D:/LeStoreSoftstore/Install/Android_Projram/Project/20260205124830/.m2/repository`。
 
@@ -135,24 +157,27 @@ app/src/main/java/com/huaying/xstz/
 ## 6. 关键架构特征
 
 - **UI 框架**：100% Jetpack Compose，使用 Material3。
-- **依赖注入**：Hilt（`@HiltAndroidApp` + `@Module` + `@Inject`），`AppModule` 提供 Database、Repository、PreferenceManager 的单例绑定。
+- **依赖注入**：Hilt（`@HiltAndroidApp` + `@Module` + `@Inject`），`AppModule` 提供 Database、FundNetworkService（TencentFundNetworkService 实现）、FundRepository、OperationLogRepository、TransactionRepository、PreferenceManager 的单例绑定。
 - **状态管理**：Compose 状态 + `produceState` / `collectAsState`，ViewModel 用于部分页面（`AssetOverviewViewModel`、`ChartsViewModel`、`UpdateViewModel`、`AddFundViewModel`、`RebalanceViewModel`、`TargetAllocationViewModel`、`AssetDetailViewModel`）。
-- **本地存储**：Room 数据库（`AppDatabase`）+ DataStore 偏好设置（`PreferenceManager`）。
-- **网络**：Retrofit + OkHttp，通过 GitHub raw 检查更新。
-- **安全**：使用 `androidx.security:security-crypto` 进行数据加密，导入导出使用 AES 加密。
+- **本地存储**：Room 数据库（`AppDatabase`，当前版本 v6）+ DataStore 偏好设置（`PreferenceManager`）。
+- **网络**：Retrofit + OkHttp，通过 GitHub raw 检查更新；腾讯财经 API（`TencentFundNetworkService`）获取基金/股票实时行情。
+- **安全**：使用 Android Keystore 系统 API（`KeyGenParameterSpec`、`KeyProperties`）进行数据加密，导入导出使用 AES 加密。
 - **图表**：MPAndroidChart（`com.github.PhilJay:MPAndroidChart`）。
-- **时间处理**：ThreeTenABP 提供 `java.time` 向后兼容。
+- **时间处理**：使用 `java.time`（API 26+ 内置，minSdk=34 无需兼容库）。
 
 ---
 
 ## 7. 常见误判提醒
 
 1. **JAVA_HOME 配置**：系统环境变量 `JAVA_HOME` 指向 `C:\Program Files\Java\jdk-21`（不存在），构建时必须显式设置为 `D:\LeStoreSoftstore\Install\Android_Projram\Studio\jbr`。
-2. **单模块项目**：`settings.gradle.kts` 仅 `include(":app")`，没有多模块结构。
+2. **单模块项目**：`settings.gradle.kts` 仅 `include(":app")`，没有多模块结构。（历史上根目录曾有 `core/`、`feature/` 等多模块实验遗留的 build 缓存，已于 2026-09-15 清理，勿再创建未注册的模块目录。）
 3. **本地 Maven 镜像**：`gradle.properties` 中 `systemProp.maven.repo.local` 指向了项目内 `.m2/repository`，构建时可能依赖本地缓存。
 4. **更新检查源**：`UpdateRepository` 通过 GitHub 仓库 `lunshi2022/xstz` 检查更新并下载 APK。
 5. **Hilt 入口**：`InvestmentApp` 标注 `@HiltAndroidApp`，所有需要注入的 Activity 需标注 `@AndroidEntryPoint`。
 6. **导航入口**：`MainScreen.kt` 是 Compose 导航的根节点，所有页面路由在此定义。
+7. **网络服务分层**：`FundNetworkService` 是接口而非实现，`TencentFundNetworkService` 是当前唯一实现，通过 Hilt 注入；不要直接引用实现类。
+8. **数据库版本**：当前 Room 数据库版本为 v6，已有 MIGRATION_1_2 至 MIGRATION_5_6，新增 Entity 字段必须编写对应 Migration。
+9. **Beta 签名配置**：当前 Release 构建暂用 Debug 签名，正式版发布前必须替换为 Release 签名。
 
 ---
 
@@ -161,20 +186,23 @@ app/src/main/java/com/huaying/xstz/
 | 热点 | 路径 | 说明 |
 |------|------|------|
 | 导航路由 | `ui/mainscreen/MainScreen.kt` | Compose NavHost 定义所有页面路由 |
-| 数据库入口 | `data/AppDatabase.kt` | Room 数据库单例，所有 DAO 从此获取 |
-| 依赖注入 | `di/AppModule.kt` | Hilt Module，提供全局单例绑定 |
+| 数据库入口 | `data/AppDatabase.kt` | Room 数据库单例（v6），所有 DAO 从此获取 |
+| 依赖注入 | `di/AppModule.kt` | Hilt Module，提供全局单例绑定（含 FundNetworkService） |
+| 网络服务 | `data/network/FundNetworkService.kt` | 基金/股票网络数据接口，TencentFundNetworkService 为唯一实现 |
 | 偏好设置 | `data/PreferenceManager.kt` | DataStore 偏好读写，主题/引导状态等 |
 | 更新检查 | `data/repository/UpdateRepository.kt` | GitHub 版本检查与 APK 下载逻辑 |
 | 加密管理 | `data/security/CryptoManager.kt` | AES 加密/解密，导入导出数据时使用 |
+| 持仓计算 | `util/HoldingsCalculator.kt` | 持仓市值、收益率、偏离度等核心计算逻辑 |
 
 ---
 
 ## 9. 契约与证据
 
-- **数据库变更**：修改 Entity 或新增 DAO 方法时，必须同步更新 `AppDatabase.kt` 的 version 和 Migration。
+- **数据库变更**：修改 Entity 或新增 DAO 方法时，必须同步更新 `AppDatabase.kt` 的 version 和 Migration。当前数据库版本为 v6。
 - **依赖变更**：修改 `app/build.gradle.kts` 中的依赖版本时，必须在 AGENTS.md 技术栈表格中同步更新。
 - **导航变更**：新增或删除页面路由时，必须同步更新 `MainScreen.kt` 中的 NavHost。
 - **Hilt 绑定变更**：新增 Repository 或全局单例时，必须同步更新 `AppModule.kt`。
+- **网络服务变更**：新增基金数据源时，需实现 `FundNetworkService` 接口并在 `AppModule.kt` 中替换绑定。
 
 ---
 
@@ -196,3 +224,5 @@ app/src/main/java/com/huaying/xstz/
 - [x] **Git 根目录**：已在项目根目录初始化 Git，`.git` 位于 `d:\LeStoreSoftstore\Install\Android_Projram\Project\20260205124830\.git`。
 - [x] **开发环境**：已安装 Android Studio / JDK 21 / Android SDK 34，使用真机调试。
 - [x] **本地 Maven 缓存**：保留 `gradle.properties` 中的本地 `.m2/repository` 缓存配置，同时保留 `settings.gradle.kts` 中的阿里云公共镜像，两者并存。
+- [ ] **Release 签名**：当前 Beta 阶段暂用 Debug 签名，正式版发布前需创建 Release Keystore 并更新 `build.gradle.kts` 中的 `signingConfigs`。
+- [ ] **HTTP 明文流量**：`usesCleartextTraffic="true"` 在 Beta 阶段保持现状（TimeRepository 降级需要），正式版需评估是否移除。

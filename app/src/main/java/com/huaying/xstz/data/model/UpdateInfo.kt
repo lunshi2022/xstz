@@ -8,7 +8,9 @@ data class UpdateInfo(
     val versionCode: Int,
     val downloadUrl: String,
     val releaseNotes: String,
-    val forceUpdate: Boolean = false
+    val forceUpdate: Boolean = false,
+    val fileSize: Long = 0L,
+    val publishDate: String = ""
 )
 
 /**

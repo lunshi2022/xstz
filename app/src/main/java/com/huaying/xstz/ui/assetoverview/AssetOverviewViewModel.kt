@@ -1,21 +1,25 @@
 package com.huaying.xstz.ui.assetoverview
 
-import android.app.Application
+import android.content.Context
 import android.os.VibrationEffect
 import android.os.Vibrator
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.huaying.xstz.data.AppDatabase
 import com.huaying.xstz.data.PreferenceManager
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
 import com.huaying.xstz.data.repository.FundRepository
 import com.huaying.xstz.data.repository.TimeRepository
 import com.huaying.xstz.util.AppConstants
+import com.huaying.xstz.util.FormatUtils
+import com.huaying.xstz.util.HoldingsCalculator
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Calendar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 sealed class AssetOverviewUiState {
     object Loading : AssetOverviewUiState()
@@ -28,13 +32,15 @@ sealed class UiEvent {
     data class ShowSnackbar(val message: String) : UiEvent()
 }
 
-class AssetOverviewViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class AssetOverviewViewModel @Inject constructor(
+    private val repository: FundRepository,
+    private val preferenceManager: PreferenceManager,
+    @ApplicationContext context: Context
+) : ViewModel() {
 
-    private val database = AppDatabase.getDatabase(application)
-    private val repository = FundRepository(database)
-    private val preferenceManager = PreferenceManager(application)
-    private val vibrator = application.getSystemService(Vibrator::class.java)
-    private val tradingTimeChecker = TradingTimeChecker(application)
+    private val vibrator = context.getSystemService(Vibrator::class.java)
+    private val tradingTimeChecker = TradingTimeChecker()
 
     private val _uiState = MutableStateFlow<AssetOverviewUiState>(AssetOverviewUiState.Loading)
     val uiState: StateFlow<AssetOverviewUiState> = _uiState.asStateFlow()
@@ -175,7 +181,7 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun getFundDisplayRatio(fund: Fund, totalAssets: Double): Double {
-        return RebalanceCalculator.calculateFundDisplayRatios(listOf(fund), totalAssets)[fund] ?: 0.0
+        return HoldingsCalculator.calculateFundDisplayRatios(listOf(fund), totalAssets)[fund] ?: 0.0
     }
 
     fun getInvestmentDays(): Int = FormatUtils.getInvestmentDays(initialInvestmentDate)
@@ -187,7 +193,7 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
     fun getWeekdayString(calendar: Calendar): String = FormatUtils.getWeekdayString(calendar)
 
     fun getFundStatus(fund: Fund, totalAssets: Double): String {
-        return RebalanceCalculator.getFundStatus(
+        return HoldingsCalculator.getFundStatus(
             fund, totalAssets, currentRebalanceThreshold,
             currentRebalanceThresholdMode, 0.0
         )
@@ -234,21 +240,20 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
 
     private suspend fun updateSummary(funds: List<Fund>) {
         try {
-            val totalAssets = repository.getTotalMarketValue()
-            val principal = repository.getTotalCost()
+            val totalAssets = HoldingsCalculator.calculateTotalAssets(funds)
+            val principal = HoldingsCalculator.calculateTotalCost(funds)
             val totalReturn = totalAssets - principal
-            val returnRate = if (principal > 0) totalReturn / principal * 100 else 0.0
+            val returnRate = HoldingsCalculator.calculateReturnRate(totalAssets, principal)
 
-            val todayReturn = funds.sumOf { fund ->
-                val currentValue = fund.holdingQuantity * fund.currentPrice
-                currentValue * fund.changePercent / 100
-            }
-            val todayReturnRate = if (principal > 0) todayReturn / principal * 100 else 0.0
+            val todayReturn = HoldingsCalculator.calculateTodayReturn(funds)
+            val yesterdayTotalAssets = getYesterdayTotalAssets()
+            val todayReturnRate = if (yesterdayTotalAssets > 0) todayReturn / yesterdayTotalAssets * 100
+                else if (principal > 0) todayReturn / principal * 100 else 0.0
 
-            val stockValue = repository.getMarketValueByType(AssetType.STOCK)
-            val bondValue = repository.getMarketValueByType(AssetType.BOND)
-            val commodityValue = repository.getMarketValueByType(AssetType.COMMODITY)
-            val cashValue = repository.getMarketValueByType(AssetType.CASH)
+            val stockValue = HoldingsCalculator.calculateMarketValueByType(funds, AssetType.STOCK)
+            val bondValue = HoldingsCalculator.calculateMarketValueByType(funds, AssetType.BOND)
+            val commodityValue = HoldingsCalculator.calculateMarketValueByType(funds, AssetType.COMMODITY)
+            val cashValue = HoldingsCalculator.calculateMarketValueByType(funds, AssetType.CASH)
 
             val summary = AssetSummary(
                 totalAssets = totalAssets,
@@ -353,19 +358,20 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
                 val isToday = FormatUtils.isSameDay(date, FormatUtils.getChinaCalendar())
 
                 if (isToday) {
-                    val todayReturn = funds.sumOf { fund ->
-                        val currentValue = fund.holdingQuantity * fund.currentPrice
-                        currentValue * fund.changePercent / 100
-                    }
-                    val todayReturnRate = if (repository.getTotalCost() > 0) {
-                        todayReturn / repository.getTotalCost() * 100
+                    val todayReturn = HoldingsCalculator.calculateTodayReturn(funds)
+                    val yesterdayTotalAssets = getYesterdayTotalAssets()
+                    val todayReturnRate = if (yesterdayTotalAssets > 0) {
+                        todayReturn / yesterdayTotalAssets * 100
+                    } else if (HoldingsCalculator.calculateTotalCost(funds) > 0) {
+                        todayReturn / HoldingsCalculator.calculateTotalCost(funds) * 100
                     } else 0.0
 
                     val fundDetails = funds.filter { it.type != AssetType.CASH }.map { fund ->
-                        val currentValue = fund.holdingQuantity * fund.currentPrice
+                        val currentValue = HoldingsCalculator.calculateCurrentValue(fund)
+                        val dailyReturn = HoldingsCalculator.calculateTodayReturn(fund)
                         FundDailyPnL(
                             fund = fund,
-                            dailyReturn = currentValue * fund.changePercent / 100,
+                            dailyReturn = dailyReturn,
                             dailyReturnRate = if (currentValue > 0) fund.changePercent else 0.0,
                             currentValue = currentValue
                         )
@@ -398,15 +404,7 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
                 (record.totalAssets - prevRecord.totalAssets) / prevRecord.totalAssets * 100
             } else 0.0
 
-            val fundDetails = funds.filter { it.type != AssetType.CASH }.map { fund ->
-                val currentValue = fund.holdingQuantity * fund.currentPrice
-                FundDailyPnL(
-                    fund = fund,
-                    dailyReturn = currentValue * fund.changePercent / 100,
-                    dailyReturnRate = fund.changePercent,
-                    currentValue = currentValue
-                )
-            }
+            val fundDetails = emptyList<FundDailyPnL>()
 
             _dailyPnLData.value = DailyPnLData(
                 date = date, totalDailyReturn = dailyReturn,
@@ -425,12 +423,19 @@ class AssetOverviewViewModel(application: Application) : AndroidViewModel(applic
     private suspend fun getPreviousRecord(date: Calendar): com.huaying.xstz.data.entity.NetValueRecord? {
         return try {
             val dayStart = FormatUtils.getDayStart(date).timeInMillis
-            repository.getRecordsSince(0L).first()
-                .filter { it.createdAt < dayStart }
-                .maxByOrNull { it.createdAt }
+            repository.getRecordBeforeTimestamp(dayStart)
         } catch (e: Exception) {
             android.util.Log.e("AssetOverviewViewModel", "getPreviousRecord failed", e)
             null
+        }
+    }
+
+    private suspend fun getYesterdayTotalAssets(): Double {
+        return try {
+            val todayStart = FormatUtils.getDayStart(FormatUtils.getChinaCalendar()).timeInMillis
+            repository.getRecordBeforeTimestamp(todayStart)?.totalAssets ?: 0.0
+        } catch (e: Exception) {
+            0.0
         }
     }
 

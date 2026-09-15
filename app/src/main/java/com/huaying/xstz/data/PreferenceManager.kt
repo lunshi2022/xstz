@@ -21,14 +21,13 @@ class PreferenceManager(private val context: Context) {
         private val THEME_MODE_KEY = intPreferencesKey("theme_mode")
         private val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
         private val REBALANCE_THRESHOLD_KEY = floatPreferencesKey("rebalance_threshold")
-        // Deprecated: old minute-based frequency
-        // private val REFRESH_FREQUENCY_KEY = intPreferencesKey("refresh_frequency")
         private val REFRESH_INTERVAL_SECONDS_KEY = intPreferencesKey("refresh_interval_seconds")
         private val REFRESH_MODE_KEY = intPreferencesKey("refresh_mode") // 0: Smart, 1: Fixed
         private val REBALANCE_THRESHOLD_MODE_KEY = intPreferencesKey("rebalance_threshold_mode") // 0: Percentage, 1: Percentage Points
         private val PRIVACY_MODE_KEY = booleanPreferencesKey("privacy_mode")
         private val SHOW_PRINCIPAL_KEY = booleanPreferencesKey("show_principal")
         private val INITIAL_INVESTMENT_DATE_KEY = longPreferencesKey("initial_investment_date")
+        private val LAST_UPDATE_DISMISSED_KEY = longPreferencesKey("last_update_dismissed")
     }
 
     // Privacy mode setting
@@ -136,6 +135,18 @@ class PreferenceManager(private val context: Context) {
     suspend fun setInitialInvestmentDate(date: Long) {
         context.dataStore.edit { preferences ->
             preferences[INITIAL_INVESTMENT_DATE_KEY] = date
+        }
+    }
+
+    // 上次关闭更新弹窗的时间戳（毫秒）
+    val lastUpdateDismissed: Flow<Long> = context.dataStore.data
+        .map { preferences ->
+            preferences[LAST_UPDATE_DISMISSED_KEY] ?: 0L
+        }
+
+    suspend fun setLastUpdateDismissed(timeMillis: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_UPDATE_DISMISSED_KEY] = timeMillis
         }
     }
 }

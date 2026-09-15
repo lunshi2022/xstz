@@ -1,12 +1,9 @@
 package com.huaying.xstz
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.SystemBarStyle
 import androidx.activity.result.contract.ActivityResultContracts
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -30,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import com.google.gson.Gson
 import com.huaying.xstz.core.init.AppInitState
@@ -40,15 +36,11 @@ import com.huaying.xstz.data.model.ExportData
 import com.huaying.xstz.data.repository.FundRepository
 import com.huaying.xstz.data.repository.OperationLogRepository
 import com.huaying.xstz.data.repository.OperationLogger
-import com.huaying.xstz.data.repository.UpdateRepository
 import com.huaying.xstz.data.security.CryptoManager
 import com.huaying.xstz.ui.mainscreen.MainScreen
 import com.huaying.xstz.ui.theme.InvestmentManagerTheme
 import com.huaying.xstz.ui.update.UpdateDialog
-import com.huaying.xstz.util.DownloadUtil
-import com.huaying.xstz.util.InstallUtil
 import com.huaying.xstz.util.performance.StartupTracer
-import com.jakewharton.threetenabp.AndroidThreeTen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.InputStreamReader
@@ -64,9 +56,6 @@ class MainActivity : ComponentActivity() {
         // 记录启动开始时间
         StartupTracer.markAppStart()
 
-        // 安装系统启动屏 - 必须在super.onCreate之前
-        val splashScreen = installSplashScreen()
-
         super.onCreate(savedInstanceState)
 
         // 根据系统当前主题判断是否深色模式
@@ -74,42 +63,35 @@ class MainActivity : ComponentActivity() {
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
 
-        // 手动设置 edge-to-edge 和状态栏外观（不使用 enableEdgeToEdge，避免它覆盖我们的设置）
+        // 手动设置 edge-to-edge 和状态栏外观
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         WindowCompat.getInsetsController(window, window.decorView).apply {
-            // 浅色模式：深色图标（isAppearanceLightStatusBars = true）
-            // 深色模式：浅色图标（isAppearanceLightStatusBars = false）
             isAppearanceLightStatusBars = !isSystemDark
             isAppearanceLightNavigationBars = !isSystemDark
         }
 
         StartupTracer.markMilestone("activity_created")
 
-        // 初始化时间库 - 必须在setContent之前
-        AndroidThreeTen.init(this)
-        StartupTracer.markMilestone("threeten_initialized")
-
-        setContent {
-            InvestmentManagerApp()
-        }
-
-        StartupTracer.markMilestone("content_set")
-
-        // 设置启动屏退出动画
+        // 设置启动屏退出动画（Android 12+ 原生 SplashScreen）
         splashScreen.setOnExitAnimationListener { splashScreenView ->
-            splashScreenView.view
+            splashScreenView
                 .animate()
                 .alpha(0f)
                 .setDuration(200)
                 .withEndAction {
                     splashScreenView.remove()
                     StartupTracer.markMilestone("splash_exited")
-                    Log.d("Startup", StartupTracer.getStartupReport())
                 }
                 .start()
         }
+
+        setContent {
+            InvestmentManagerApp()
+        }
+
+        StartupTracer.markMilestone("content_set")
     }
 }
 
@@ -155,20 +137,10 @@ fun InvestmentManagerApp() {
             else -> !isSystemDark
         }
 
-        Log.d("StatusBar", "themeMode=$themeMode, isSystemDark=$isSystemDark, shouldUseDarkIcons=$shouldUseDarkIcons")
-
         // 新 API (API 23+)
         WindowCompat.getInsetsController(window, view).apply {
             isAppearanceLightStatusBars = shouldUseDarkIcons
             isAppearanceLightNavigationBars = shouldUseDarkIcons
-        }
-
-        // 旧 API 兜底 (API 23-29)，直接操作 systemUiVisibility 标志位
-        @Suppress("DEPRECATION")
-        view.systemUiVisibility = if (shouldUseDarkIcons) {
-            view.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        } else {
-            view.systemUiVisibility and android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
         }
     }
 
@@ -255,20 +227,14 @@ fun MainContent(
     val gson = remember { Gson() }
     val cryptoManager = remember { CryptoManager() }
 
-    // 自动检查更新状态
-    var showAutoUpdateDialog by remember { mutableStateOf(false) }
-    var autoUpdateInfo by remember { mutableStateOf<com.huaying.xstz.data.model.UpdateInfo?>(null) }
+    // 自动检查更新 ViewModel
+    val updateViewModel = remember { com.huaying.xstz.ui.update.UpdateViewModel(context) }
 
     // 应用启动时自动检查更新
     LaunchedEffect(Unit) {
         // 延迟 3 秒后检查更新，避免影响启动速度
         delay(3000)
-        val updateRepository = UpdateRepository(context)
-        val result = updateRepository.checkForUpdate("lunshi2022", "xstz")
-        if (result.hasUpdate && result.updateInfo != null) {
-            autoUpdateInfo = result.updateInfo
-            showAutoUpdateDialog = true
-        }
+        updateViewModel.checkForUpdate(showNoUpdate = false)
     }
 
     val refreshIntervalSeconds by preferenceManager.refreshIntervalSeconds.collectAsState(initial = 3)
@@ -347,23 +313,7 @@ fun MainContent(
         darkTheme = darkTheme,
         exportLauncher = exportLauncher,
         importLauncher = importLauncher,
-        scope = scope
+        scope = scope,
+        autoUpdateViewModel = updateViewModel
     )
-
-    // 自动更新对话框
-    if (showAutoUpdateDialog && autoUpdateInfo != null) {
-        UpdateDialog(
-            updateInfo = autoUpdateInfo!!,
-            onDismiss = { showAutoUpdateDialog = false },
-            onConfirm = {
-                val downloadUtil = DownloadUtil(context)
-                val fileName = "xstz-update-${autoUpdateInfo!!.versionName}.apk"
-                val downloadId = downloadUtil.downloadApk(autoUpdateInfo!!.downloadUrl, fileName)
-                downloadUtil.registerDownloadCompleteListener(downloadId, fileName) { uri ->
-                    InstallUtil.installApk(context, uri)
-                }
-                showAutoUpdateDialog = false
-            }
-        )
-    }
 }

@@ -27,7 +27,7 @@ import com.huaying.xstz.data.entity.Transaction
         TargetAllocation::class,
         OperationLog::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(EncryptedDoubleConverter::class, AssetTypeConverter::class)
@@ -83,6 +83,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE funds ADD COLUMN preClosePrice REAL NOT NULL DEFAULT 0.0")
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 将唯一索引从 code 改为 code+name 复合索引，允许同一代码不同名称的基金共存
+                database.execSQL("DROP INDEX IF EXISTS index_funds_code")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_funds_code_name ON funds(code, name)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -90,7 +104,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "investment_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

@@ -22,15 +22,18 @@ class ThousandSeparatorTransformation : VisualTransformation {
 
     private fun formatWithSeparators(text: String): String {
         if (text.isEmpty()) return ""
-        val dotIndex = text.indexOf('.')
-        val intPart = if (dotIndex >= 0) text.substring(0, dotIndex) else text
-        val decimalPart = if (dotIndex >= 0) text.substring(dotIndex) else ""
+        val negative = text.startsWith("-")
+        val content = if (negative) text.substring(1) else text
+        val dotIndex = content.indexOf('.')
+        val intPart = if (dotIndex >= 0) content.substring(0, dotIndex) else content
+        val decimalPart = if (dotIndex >= 0) content.substring(dotIndex) else ""
         val formattedIntPart = if (intPart.isNotEmpty()) {
             intPart.reversed().chunked(3).joinToString(",").reversed()
         } else {
             ""
         }
-        return formattedIntPart + decimalPart
+        val sign = if (negative) "-" else ""
+        return sign + formattedIntPart + decimalPart
     }
 
     private class SeparatorOffsetMapping(

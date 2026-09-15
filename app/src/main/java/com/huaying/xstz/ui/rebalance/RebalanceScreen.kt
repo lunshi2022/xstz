@@ -21,9 +21,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -35,6 +39,7 @@ import com.huaying.xstz.ui.component.ThousandSeparatorTransformation
 import com.huaying.xstz.ui.theme.ThemeConstants
 import com.huaying.xstz.ui.theme.getColorForAssetType
 import com.huaying.xstz.util.AppConstants
+import com.huaying.xstz.util.HoldingsCalculator
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.abs
@@ -60,7 +65,7 @@ fun RebalanceScreen(
                 compareBy<Fund> { it.type.ordinal }
                     .thenByDescending { it.holdingQuantity * it.currentPrice }
             ),
-            totalAssets = initialFunds.sumOf { it.holdingQuantity * it.currentPrice }
+            totalAssets = HoldingsCalculator.calculateTotalAssets(initialFunds)
         )
     }
 
@@ -86,7 +91,32 @@ fun RebalanceScreen(
     val scope = rememberCoroutineScope()
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 120.dp)
+            ) { data ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF424242),
+                        border = BorderStroke(1.dp, Color(0xFF666666))
+                    ) {
+                        Text(
+                            text = data.visuals.message,
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp)
+                        )
+                    }
+                }
+            }
+        },
         topBar = {
             val backgroundColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
             Row(
@@ -130,17 +160,11 @@ fun RebalanceScreen(
         ) {
             // 0. Target Ratio Configuration Entry
             item {
-                val totalTargetRatio = funds.filter { it.type != AssetType.CASH }.sumOf { it.targetRatio }
-                val isValidRatio = abs(totalTargetRatio - 1.0) < AppConstants.RATIO_EQUALITY_THRESHOLD
-                val totalAssetsLocal = funds.sumOf { it.holdingQuantity * it.currentPrice }
-                val hasSevereDeviation = if (totalAssetsLocal > 0) {
-                    funds.any { fund ->
-                        val currentRatio = (fund.holdingQuantity * fund.currentPrice) / totalAssetsLocal * 100
-                        val targetRatio = fund.targetRatio * 100
-                        val deviation = abs(currentRatio - targetRatio)
-                        deviation > AppConstants.SEVERE_DEVIATION_THRESHOLD
-                    }
-                } else false
+                val totalTargetRatio = HoldingsCalculator.calculateNonCashTotalRatio(funds) / AppConstants.PERCENTAGE_BASE
+                val isOverRatio = totalTargetRatio > 1.0 + AppConstants.RATIO_EQUALITY_THRESHOLD
+                val isNoTarget = totalTargetRatio < AppConstants.RATIO_EQUALITY_THRESHOLD
+                val totalAssetsLocal = HoldingsCalculator.calculateTotalAssets(funds)
+                val hasSevereDeviation = HoldingsCalculator.hasSevereDeviation(funds, totalAssetsLocal)
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -166,17 +190,24 @@ fun RebalanceScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            if (!isValidRatio) {
+                            if (isOverRatio) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "非现金资产占比: ${ThemeConstants.Format.PERCENT_2F.format(Locale.CHINA, totalTargetRatio * AppConstants.PERCENTAGE_BASE)} ⚠ 需调整",
+                                    text = "非现金占比合计 ${ThemeConstants.Format.PERCENT_2F.format(Locale.CHINA, totalTargetRatio * AppConstants.PERCENTAGE_BASE)}，超过100%无法再平衡",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else if (isNoTarget) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "请先设置各基金目标占比",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error
                                 )
                             } else if (hasSevereDeviation) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "部分基金偏离目标配置 ⚠ 需调整",
+                                    text = "当前持仓偏离目标较大，建议执行再平衡",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error
                                 )
@@ -225,53 +256,34 @@ fun RebalanceScreen(
                                             .clickable { showThresholdDialog = true }
                                     )
                                 }
-                                Row(
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                SingleChoiceSegmentedButtonRow(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.8f)
+                                        .padding(top = 4.dp)
                                 ) {
-                                    AssistChip(
+                                    SegmentedButton(
+                                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                                         onClick = {
+                                            focusManager.clearFocus()
                                             viewModel.setThresholdMode(0)
-                                            if (thresholdInput.isNotEmpty()) {
-                                                val currentVal = thresholdInput.toIntOrNull() ?: 20
-                                                if (currentVal < AppConstants.THRESHOLD_PERCENT_MIN) viewModel.setThresholdInput(AppConstants.THRESHOLD_PERCENT_MIN.toString())
-                                                if (currentVal > AppConstants.THRESHOLD_PERCENT_MAX) viewModel.setThresholdInput(AppConstants.THRESHOLD_PERCENT_MAX.toString())
-                                            }
                                         },
-                                        label = { Text("百分比模式", style = MaterialTheme.typography.labelSmall) },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = if (thresholdMode == 0) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            labelColor = if (thresholdMode == 0) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = if (thresholdMode == 0) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                                        )
+                                        selected = thresholdMode == 0,
+                                        label = { Text("百分比模式", style = MaterialTheme.typography.labelSmall) }
                                     )
-                                    AssistChip(
+                                    SegmentedButton(
+                                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                                         onClick = {
+                                            focusManager.clearFocus()
                                             viewModel.setThresholdMode(1)
-                                            if (thresholdInput.isNotEmpty()) {
-                                                val currentVal = thresholdInput.toIntOrNull() ?: 5
-                                                if (currentVal < AppConstants.THRESHOLD_POINT_MIN) viewModel.setThresholdInput(AppConstants.THRESHOLD_POINT_MIN.toString())
-                                                if (currentVal > AppConstants.THRESHOLD_POINT_MAX) viewModel.setThresholdInput(AppConstants.THRESHOLD_POINT_MAX.toString())
-                                            }
                                         },
-                                        label = { Text("百分点模式", style = MaterialTheme.typography.labelSmall) },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = if (thresholdMode == 1) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            labelColor = if (thresholdMode == 1) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = if (thresholdMode == 1) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                                        )
+                                        selected = thresholdMode == 1,
+                                        label = { Text("百分点模式", style = MaterialTheme.typography.labelSmall) }
                                     )
                                 }
                             }
 
-                            val thresholdMinVal = if (thresholdMode == 0) 5 else 1
-                            val thresholdMaxVal = if (thresholdMode == 0) 25 else 10
+                            val thresholdMinVal = AppConstants.THRESHOLD_MIN
+                            val thresholdMaxVal = AppConstants.THRESHOLD_MAX
                             Box(
                                 modifier = Modifier
                                     .width(100.dp)
@@ -294,6 +306,8 @@ fun RebalanceScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
+                                    val thresholdFocusRequester = remember { FocusRequester() }
+                                    var wasThresholdFocused by remember { mutableStateOf(false) }
                                     BasicTextField(
                                         value = thresholdInput,
                                         onValueChange = { input ->
@@ -301,7 +315,15 @@ fun RebalanceScreen(
                                                 viewModel.setThresholdInput(input)
                                             }
                                         },
-                                        modifier = Modifier.widthIn(min = 30.dp, max = 50.dp),
+                                        modifier = Modifier
+                                            .widthIn(min = 30.dp, max = 50.dp)
+                                            .focusRequester(thresholdFocusRequester)
+                                            .onFocusChanged { focusState ->
+                                                if (wasThresholdFocused && !focusState.isFocused) {
+                                                    viewModel.onThresholdInputFocusLost()
+                                                }
+                                                wasThresholdFocused = focusState.isFocused
+                                            },
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(
                                             keyboardType = KeyboardType.Number,
@@ -311,7 +333,8 @@ fun RebalanceScreen(
                                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
-                                        )
+                                        ),
+                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
                                     )
                                     Text(
                                         text = if (thresholdMode == 0) "%" else "pt",
@@ -324,8 +347,8 @@ fun RebalanceScreen(
                         }
 
                         val inputVal = thresholdInput.toIntOrNull()
-                        val minVal = if (thresholdMode == 0) 5 else 1
-                        val maxVal = if (thresholdMode == 0) 25 else 10
+                        val minVal = AppConstants.THRESHOLD_MIN
+                        val maxVal = AppConstants.THRESHOLD_MAX
 
                         if (!isRealData) {
                             // 预加载数据阶段，不显示阈值提示（ViewModel 尚未加载偏好设置）
@@ -333,7 +356,7 @@ fun RebalanceScreen(
                             when {
                                 inputVal != null && inputVal !in minVal..maxVal -> {
                                     Text(
-                                        text = "请输入 $minVal-$maxVal 之间的整数",
+                                        text = "请输入 $minVal~$maxVal 之间的整数",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.padding(start = 4.dp)
@@ -341,7 +364,7 @@ fun RebalanceScreen(
                                 }
                                 thresholdInput.isEmpty() -> {
                                     Text(
-                                        text = "未输入将默认使用 ${if (thresholdMode == 0) "20%" else "5个百分点"}",
+                                        text = "留空则默认 5",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                         modifier = Modifier.padding(start = 4.dp)
@@ -349,7 +372,7 @@ fun RebalanceScreen(
                                 }
                                 else -> {
                                     Text(
-                                        text = if (thresholdMode == 0) "计算公式：目标比例 ± (目标比例 × $inputVal%)" else "计算公式：目标比例 ± $inputVal%",
+                                        text = if (thresholdMode == 0) "允许范围：目标比例 ± (目标比例 × $inputVal%)" else "允许范围：目标比例 ± $inputVal 百分点",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                         modifier = Modifier.padding(start = 4.dp)
@@ -409,8 +432,10 @@ fun RebalanceScreen(
                                 ) {
                                     Text(
                                         text = "¥",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        ),
                                         modifier = Modifier.padding(end = 8.dp)
                                     )
                                     BasicTextField(
@@ -428,16 +453,21 @@ fun RebalanceScreen(
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         ),
+                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                                         visualTransformation = ThousandSeparatorTransformation(),
                                         decorationBox = { innerTextField ->
-                                            if (newFundInput.isEmpty()) {
-                                                Text(
-                                                    text = "正数买入，负数卖出",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                                )
+                                            Box(contentAlignment = Alignment.CenterStart) {
+                                                if (newFundInput.isEmpty()) {
+                                                    Text(
+                                                        text = "输入正数追加资金，负数取出资金",
+                                                        style = MaterialTheme.typography.titleMedium.copy(
+                                                            fontWeight = FontWeight.Normal,
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                                        )
+                                                    )
+                                                }
+                                                innerTextField()
                                             }
-                                            innerTextField()
                                         }
                                     )
                                 }
@@ -445,7 +475,7 @@ fun RebalanceScreen(
 
                             if (isWithdrawError) {
                                 Text(
-                                    text = "取出金额不能超过总资产 (${ThemeConstants.Format.CURRENCY_2F.format(totalAssets)})",
+                                    text = "取出金额不能超过当前总资产 (${ThemeConstants.Format.CURRENCY_2F.format(totalAssets)})",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.padding(top = 4.dp, start = 4.dp)
@@ -478,7 +508,7 @@ fun RebalanceScreen(
                                  fontWeight = FontWeight.Bold
                              )
                              Text(
-                                 text = "忽略阈值，强制对齐目标比例",
+                                 text = "忽略偏离度阈值，将所有持仓对齐目标比例",
                                  style = MaterialTheme.typography.bodySmall,
                                  color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                              )
@@ -512,7 +542,7 @@ fun RebalanceScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "调整后结果",
+                                text = "建议调整方案",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -526,7 +556,7 @@ fun RebalanceScreen(
                                     val strategy = if (selectedLogicMode == AppConstants.LOGIC_MODE_FULL) RebalanceStrategy.FULL_REBALANCE else RebalanceStrategy.SMART
                                     viewModel.executeRebalance(strategy) {
                                         scope.launch {
-                                            snackbarHostState.showSnackbar("交易已完成")
+                                            snackbarHostState.showSnackbar("再平衡交易已执行")
                                         }
                                     }
                                 },
@@ -537,7 +567,7 @@ fun RebalanceScreen(
                                 shape = MaterialTheme.shapes.medium
                             ) {
                                 Text(
-                                    text = "确认交易 (${adjustmentList.size} 笔)",
+                                    text = "确认执行 (${adjustmentList.size} 笔交易)",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -605,7 +635,7 @@ fun RebalanceScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                "适合所有比例。例：目标25%，阈值20%，允许范围20%-30%",
+                                "按比例浮动，适合所有仓位。例：目标25%，阈值20%，允许范围20%~30%",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
@@ -653,7 +683,7 @@ fun RebalanceScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                "适合大比例资产。例：目标25%，阈值5%，允许范围20%-30%",
+                                "固定幅度浮动，适合大比例仓位。例：目标25%，阈值5%，允许范围20%~30%",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
@@ -677,7 +707,7 @@ fun RebalanceScreen(
                                 color = MaterialTheme.colorScheme.tertiary
                             )
                             Text(
-                                "偏离度阈值始终以「目标比例」为固定锚点，不会随资产波动而漂移。",
+                                "偏离度阈值始终以「目标比例」为锚点，不会随资产市值波动而变化。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                             )
@@ -700,12 +730,12 @@ fun RebalanceScreen(
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                "• 最小交易单位：A股/ETF 最低1手(100股)",
+                                "• 最小交易单位：A股/ETF 最低1手（100股）",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
                             Text(
-                                "• 流动性检查：买入需确保有足够流动资金",
+                                "• 买入前需确保有足够可用资金",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )

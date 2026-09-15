@@ -3,8 +3,8 @@ package com.huaying.xstz.ui.rebalance
 import com.huaying.xstz.data.entity.AssetType
 import com.huaying.xstz.data.entity.Fund
 import com.huaying.xstz.util.AppConstants
+import com.huaying.xstz.util.HoldingsCalculator
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.round
 
 data class AdjustmentItem(
@@ -82,25 +82,16 @@ private fun internalCalculateAdjustments(
 
     val fundAllocations = mutableMapOf<Long, Double>()
 
-    val safeThreshold = if (thresholdMode == 0) {
-        thresholdPct.coerceIn(
-            AppConstants.THRESHOLD_PERCENT_MIN.toFloat(),
-            AppConstants.THRESHOLD_PERCENT_MAX.toFloat()
-        )
-    } else {
-        thresholdPct.coerceIn(
-            AppConstants.THRESHOLD_POINT_MIN.toFloat(),
-            AppConstants.THRESHOLD_POINT_MAX.toFloat()
-        )
-    }
+    val safeThreshold = thresholdPct.coerceIn(
+        AppConstants.THRESHOLD_MIN.toFloat(),
+        AppConstants.THRESHOLD_MAX.toFloat()
+    )
 
     val deviations = funds.associate { fund ->
         val targetRatio = targetRatios[fund.id] ?: 0.0
-        val finalDev: Double = if (thresholdMode == 0) {
-            max(targetRatio * (safeThreshold / AppConstants.PERCENTAGE_BASE), AppConstants.MIN_ABS_DEVIATION)
-        } else {
-            (safeThreshold / AppConstants.PERCENTAGE_BASE).toDouble()
-        }
+        val finalDev = HoldingsCalculator.calculateEffectiveDeviationRatio(
+            targetRatio, safeThreshold, thresholdMode
+        )
         fund.id to finalDev
     }
 
@@ -272,7 +263,7 @@ private fun internalCalculateAdjustments(
         if (abs(finalAmount) > 0.01) {
             actualNonCashUsed += finalAmount
 
-            val currentVal = plan.fund.holdingQuantity * plan.fund.currentPrice
+            val currentVal = HoldingsCalculator.calculateCurrentValue(plan.fund)
             val currentRatio = if (totalAssets > 0) currentVal / totalAssets * AppConstants.PERCENTAGE_BASE else 0.0
             val targetVal = currentVal + finalAmount
             val targetRatio = if (futureTotal > 0) targetVal / futureTotal * AppConstants.PERCENTAGE_BASE else 0.0
@@ -294,7 +285,7 @@ private fun internalCalculateAdjustments(
 
     if (abs(totalCashChange) > 0.01 && cashFunds.isNotEmpty()) {
         val targetCashFund = cashFunds.first()
-        val currentVal = targetCashFund.holdingQuantity * targetCashFund.currentPrice
+        val currentVal = HoldingsCalculator.calculateCurrentValue(targetCashFund)
         val currentRatio = if (totalAssets > 0) currentVal / totalAssets * AppConstants.PERCENTAGE_BASE else 0.0
         val targetVal = currentVal + totalCashChange
         val targetRatio = if (futureTotal > 0) targetVal / futureTotal * AppConstants.PERCENTAGE_BASE else 0.0

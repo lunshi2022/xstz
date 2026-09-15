@@ -25,6 +25,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
 import com.huaying.xstz.ui.theme.*
+import com.huaying.xstz.util.FormatUtils
 
 // 筛选类型
 enum class FilterType {
@@ -208,7 +209,7 @@ fun TransactionHistoryScreen(
 
 @Composable
 fun TransactionItemRow(transaction: Transaction, isCash: Boolean) {
-    val dateStr = com.huaying.xstz.ui.assetoverview.FormatUtils.formatShortDateTime(transaction.createdAt)
+    val dateStr = FormatUtils.formatShortDateTime(transaction.createdAt)
     
     // 判断是否为收入（卖出/转出是收入，显示绿色）
     val isIncome = transaction.type == TransactionType.SELL || transaction.type == TransactionType.WITHDRAW
@@ -246,7 +247,7 @@ fun TransactionItemRow(transaction: Transaction, isCash: Boolean) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = com.huaying.xstz.ui.assetoverview.FormatUtils.formatCurrency(displayAmount),
+                text = FormatUtils.formatCurrency(displayAmount),
                 style = MaterialTheme.typography.titleMedium,
                 color = amountColor,
                 fontWeight = FontWeight.Bold
@@ -271,7 +272,7 @@ fun TransactionItemRow(transaction: Transaction, isCash: Boolean) {
                 transaction.type == TransactionType.SELL || 
                 transaction.type == TransactionType.REBALANCE) {
                 Text(
-                    text = "${String.format(Locale.CHINA, "%.3f", transaction.price)}元 * ${String.format(Locale.CHINA, "%.0f", transaction.quantity)}份",
+                    text = "${FormatUtils.formatPrice(transaction.price)}元 * ${FormatUtils.formatQuantity(transaction.quantity)}份",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

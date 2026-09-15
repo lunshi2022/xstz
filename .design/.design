@@ -1,0 +1,92 @@
+{
+  "data": [
+    {
+      "id": "page-asset-overview",
+      "type": "page",
+      "title": "资产概览",
+      "version": 1,
+      "createdAt": 1786025742000,
+      "canvasData": {
+        "deviceType": "mobile",
+        "viewportMode": "app-shell",
+        "htmlSrc": "pages/asset-overview.html",
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 375,
+          "sourceHash": "fnv1a-a28e9b74",
+          "measuredAt": 1786027038067
+        },
+        "x": 0,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/asset-overview.html"
+      }
+    },
+    {
+      "id": "page-fund-detail",
+      "type": "page",
+      "title": "基金详情",
+      "version": 1,
+      "createdAt": 1786025742000,
+      "canvasData": {
+        "deviceType": "mobile",
+        "viewportMode": "app-shell",
+        "htmlSrc": "pages/fund-detail.html",
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 375,
+          "sourceHash": "fnv1a-9becefb6",
+          "measuredAt": 1786027038067
+        },
+        "x": 309,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/fund-detail.html"
+      }
+    },
+    {
+      "id": "page-settings",
+      "type": "page",
+      "title": "设置",
+      "version": 1,
+      "createdAt": 1786025742000,
+      "canvasData": {
+        "deviceType": "mobile",
+        "viewportMode": "app-shell",
+        "htmlSrc": "pages/settings.html",
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 375,
+          "sourceHash": "fnv1a-e0786847",
+          "measuredAt": 1786028134640
+        },
+        "x": 618,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/settings.html"
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "designLibrary": {
+      "name": "苹果",
+      "id": "dl_builtin_apple",
+      "version": "1.0",
+      "scope": "built-in-global",
+      "path": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple",
+      "versionSource": "metadata.json"
+    },
+    "visualEditorEnabled": false
+  }
+}

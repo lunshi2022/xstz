@@ -29,7 +29,7 @@ object HolidayDateProvider {
                 val timestamp = cal.timeInMillis
                 holidayDateSet.add(timestamp)
 
-                val name = resolveHolidayName(localDate.monthValue, localDate.dayOfMonth)
+                val name = resolveHolidayName(localDate.year, localDate.monthValue, localDate.dayOfMonth)
                 holidayNameMap[timestamp] = name
             }
 
@@ -40,16 +40,30 @@ object HolidayDateProvider {
         }
     }
 
-    private fun resolveHolidayName(month: Int, day: Int): String {
-        return when (month) {
-            1 -> if (day == 1) "元旦" else "休"
-            2 -> if (day in 16..23) "春节" else "休"
-            4 -> if (day in 4..6) "清明" else "休"
-            5 -> if (day in 1..5) "劳动节" else "休"
-            6 -> if (day in 19..21) "端午" else "休"
-            9 -> if (day in 25..27) "中秋" else "休"
-            10 -> if (day in 1..8) "国庆" else "休"
-            else -> "休"
+    private fun resolveHolidayName(year: Int, month: Int, day: Int): String {
+        // 各年份节假日：只有每个假期的第一天显示名称，其余显示"休"
+        val holidayFirstDay: Map<Pair<Int, Int>, String> = when (year) {
+            2026 -> mapOf(
+                (1 to 1) to "元旦",
+                (2 to 16) to "春节",
+                (4 to 4) to "清明",
+                (5 to 1) to "劳动节",
+                (6 to 19) to "端午",
+                (9 to 25) to "中秋",
+                (10 to 1) to "国庆"
+            )
+            2027 -> mapOf(
+                (1 to 1) to "元旦",
+                (2 to 5) to "春节",
+                (4 to 4) to "清明",
+                (5 to 1) to "劳动节",
+                (6 to 9) to "端午",
+                (9 to 15) to "中秋",
+                (10 to 1) to "国庆"
+            )
+            else -> emptyMap()
         }
+
+        return holidayFirstDay[month to day] ?: "休"
     }
 }

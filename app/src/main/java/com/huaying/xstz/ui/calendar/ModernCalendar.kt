@@ -34,8 +34,8 @@ import com.huaying.xstz.ui.theme.DangerRed
 import com.huaying.xstz.ui.theme.SuccessGreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.threeten.bp.LocalDate
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 
@@ -106,6 +106,7 @@ fun ModernCalendar(
     funds: List<Fund> = emptyList(),
     holidays: Set<LocalDate> = emptySet(),
     workdays: Set<LocalDate> = emptySet(),
+    holidayNames: Map<LocalDate, String> = emptyMap(),
     onDateSelected: (LocalDate, DailyAssetData?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
@@ -180,6 +181,7 @@ fun ModernCalendar(
                 calendarData = calendarData,
                 holidays = holidays,
                 workdays = workdays,
+                holidayNames = holidayNames,
                 maxProfit = maxProfit,
                 maxLoss = maxLoss,
                 onDateSelected = { date ->
@@ -427,6 +429,7 @@ private fun CalendarGrid(
     calendarData: Map<LocalDate, DailyAssetData>,
     holidays: Set<LocalDate>,
     workdays: Set<LocalDate>,
+    holidayNames: Map<LocalDate, String>,
     maxProfit: Double,
     maxLoss: Double,
     onDateSelected: (LocalDate) -> Unit,
@@ -490,6 +493,7 @@ private fun CalendarGrid(
                         val dailyData = calendarData[date]
                         val isHoliday = holidays.contains(date)
                         val isWorkday = workdays.contains(date)
+                        val hName = holidayNames[date]
 
                         CalendarDayCell(
                             date = date,
@@ -499,6 +503,7 @@ private fun CalendarGrid(
                             isSelected = selectedDate == date,
                             isHoliday = isHoliday,
                             isWorkday = isWorkday,
+                            holidayName = hName,
                             maxProfit = maxProfit,
                             maxLoss = maxLoss,
                             onClick = {
@@ -533,6 +538,7 @@ private fun CalendarDayCell(
     isSelected: Boolean,
     isHoliday: Boolean = false,
     isWorkday: Boolean = false,
+    holidayName: String? = null,
     maxProfit: Double = 0.0,
     maxLoss: Double = 0.0,
     onClick: () -> Unit
@@ -547,7 +553,7 @@ private fun CalendarDayCell(
         it.totalAsset - prevAsset
     } ?: 0.0
 
-    // 根据盈亏计算颜色 - A股习惯：盈红亏绿
+    // 根据盈亏计算颜色 - A股习惯：盈红亏绿，颜色渐变
     val (backgroundColor, textColor, amountColor) = when {
         !isCurrentMonth -> Triple(
             Color.Transparent,
@@ -565,9 +571,9 @@ private fun CalendarDayCell(
             val colorIndex = (intensity * (CalendarConfig.ProfitColors.size - 1)).toInt()
                 .coerceIn(0, CalendarConfig.ProfitColors.size - 1)
             val bgColor = CalendarConfig.ProfitColors[colorIndex]
-            // 根据背景色深度调整文字颜色
-            val textColorValue = if (intensity > 0.6) Color.White else Color(0xFFB71C1C)
-            val amountColorValue = if (intensity > 0.6) Color.White.copy(alpha = 0.9f) else Color(0xFFC62828)
+            // 根据背景色深度调整文字颜色，确保清晰
+            val textColorValue = if (intensity > 0.5) Color.White else DangerRed
+            val amountColorValue = if (intensity > 0.5) Color.White else DangerRed
             Triple(
                 bgColor,
                 textColorValue,
@@ -580,9 +586,9 @@ private fun CalendarDayCell(
             val colorIndex = (intensity * (CalendarConfig.LossColors.size - 1)).toInt()
                 .coerceIn(0, CalendarConfig.LossColors.size - 1)
             val bgColor = CalendarConfig.LossColors[colorIndex]
-            // 根据背景色深度调整文字颜色
-            val textColorValue = if (intensity > 0.6) Color.White else Color(0xFF1B5E20)
-            val amountColorValue = if (intensity > 0.6) Color.White.copy(alpha = 0.9f) else Color(0xFF2E7D32)
+            // 根据背景色深度调整文字颜色，确保清晰
+            val textColorValue = if (intensity > 0.5) Color.White else SuccessGreen
+            val amountColorValue = if (intensity > 0.5) Color.White else SuccessGreen
             Triple(
                 bgColor,
                 textColorValue,
@@ -689,7 +695,7 @@ private fun CalendarDayCell(
                     .padding(horizontal = 2.dp, vertical = 1.dp)
             ) {
                 Text(
-                    text = "休",
+                    text = holidayName ?: "休",
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,

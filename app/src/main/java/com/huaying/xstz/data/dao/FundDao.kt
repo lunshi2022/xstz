@@ -12,6 +12,9 @@ interface FundDao {
     
     @Query("SELECT * FROM funds WHERE id = :id")
     suspend fun getFundById(id: Long): Fund?
+
+    @Query("SELECT * FROM funds WHERE id = :id")
+    fun getFundByIdFlow(id: Long): Flow<Fund?>
     
     @Query("SELECT * FROM funds WHERE code = :code")
     suspend fun getFundByCode(code: String): Fund?
@@ -51,4 +54,7 @@ interface FundDao {
     
     @Query("SELECT SUM(holdingQuantity * currentPrice) FROM funds WHERE type = :type")
     suspend fun getMarketValueByType(type: AssetType): Double?
+
+    @Query("UPDATE funds SET targetRatio = :targetRatio, updatedAt = :updatedAt WHERE id = :fundId")
+    suspend fun updateFundTargetRatio(fundId: Long, targetRatio: Double, updatedAt: Long)
 }

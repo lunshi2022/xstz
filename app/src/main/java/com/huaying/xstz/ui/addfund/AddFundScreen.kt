@@ -41,6 +41,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +49,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.huaying.xstz.data.entity.AssetType
+import com.huaying.xstz.data.entity.toDisplayName
 import com.huaying.xstz.data.entity.OperationType
 import com.huaying.xstz.data.repository.OperationLogRepository
 import com.huaying.xstz.data.repository.OperationLogger
@@ -547,48 +549,24 @@ fun AddFundScreen(
                         else
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    val assetTypeEntries = remember { AssetType.entries.filter { it != AssetType.CASH } }
+                    val selectedTypeIndex = assetTypeEntries.indexOf(selectedType).coerceAtLeast(0)
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        AssetType.values().filter { it != AssetType.CASH }.forEach { type ->
-                            val typeName = when (type) {
-                                AssetType.STOCK -> "股票"
-                                AssetType.BOND -> "债券"
-                                AssetType.COMMODITY -> "商品"
-                                AssetType.CASH -> "现金"
-                            }
-                            val isSelected = selectedType == type
-                            val interactionSource = remember { MutableInteractionSource() }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable(
-                                        enabled = isFundNameValid,
-                                        interactionSource = interactionSource,
-                                        indication = LocalIndication.current
-                                    ) { viewModel.setSelectedType(type) }
-                                    .background(
-                                        color = when {
-                                            !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                                            isSelected -> MaterialTheme.colorScheme.primaryContainer
-                                            else -> MaterialTheme.colorScheme.surface
-                                        }
+                        assetTypeEntries.forEachIndexed { index, type ->
+                            SegmentedButton(
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = assetTypeEntries.size),
+                                onClick = { if (isFundNameValid) viewModel.setSelectedType(type) },
+                                selected = index == selectedTypeIndex,
+                                label = {
+                                    Text(
+                                        type.toDisplayName(),
+                                        fontSize = 14.sp,
+                                        fontWeight = if (index == selectedTypeIndex) FontWeight.Medium else FontWeight.Normal
                                     )
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = typeName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = when {
-                                        !isFundNameValid -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    }
-                                )
-                            }
+                                }
+                            )
                         }
                     }
                 }
@@ -624,73 +602,33 @@ fun AddFundScreen(
                             else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                         )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth(0.7f)
                         ) {
-                            val shareInteractionSource = remember { MutableInteractionSource() }
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable(
-                                        enabled = isFundNameValid && !hasMarketInput,
-                                        interactionSource = shareInteractionSource,
-                                        indication = LocalIndication.current
-                                    ) { viewModel.setInputMode(true) }
-                                    .background(
-                                        color = when {
-                                            !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                                            hasMarketInput -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                            inputMode -> MaterialTheme.colorScheme.primaryContainer
-                                            else -> MaterialTheme.colorScheme.surface
-                                        }
+                            SegmentedButton(
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                                onClick = { if (isFundNameValid && !hasMarketInput) viewModel.setInputMode(true) },
+                                selected = inputMode,
+                                label = {
+                                    Text(
+                                        "按份额",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (inputMode) FontWeight.Medium else FontWeight.Normal
                                     )
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "按份额",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = when {
-                                        !isFundNameValid -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                        hasMarketInput -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                        inputMode -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    },
-                                    fontWeight = if (inputMode) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                            val marketInteractionSource = remember { MutableInteractionSource() }
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable(
-                                        enabled = isFundNameValid && !hasShareInput,
-                                        interactionSource = marketInteractionSource,
-                                        indication = LocalIndication.current
-                                    ) { viewModel.setInputMode(false) }
-                                    .background(
-                                        color = when {
-                                            !isFundNameValid -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                                            hasShareInput -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                            !inputMode -> MaterialTheme.colorScheme.primaryContainer
-                                            else -> MaterialTheme.colorScheme.surface
-                                        }
+                                }
+                            )
+                            SegmentedButton(
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                                onClick = { if (isFundNameValid && !hasShareInput) viewModel.setInputMode(false) },
+                                selected = !inputMode,
+                                label = {
+                                    Text(
+                                        "按市值",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (!inputMode) FontWeight.Medium else FontWeight.Normal
                                     )
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "按市值",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = when {
-                                        !isFundNameValid -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                        hasShareInput -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                        !inputMode -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    },
-                                    fontWeight = if (!inputMode) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
+                                }
+                            )
                         }
                     }
 

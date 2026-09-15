@@ -8,7 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -30,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.huaying.xstz.ui.animation.AnimationConstants
 import com.huaying.xstz.ui.animation.interaction.bouncyClickable
 import com.huaying.xstz.ui.navigation.Route
+import com.huaying.xstz.ui.theme.ThemeConstants
 
 /**
  * 自定义底部导航栏组件
@@ -48,7 +48,8 @@ fun CustomBottomNavigationBar(
     onAddClick: () -> Unit,
     darkTheme: Boolean,
     exitOffsetFraction: Float = 0f,
-    exitAlpha: Float = 1f
+    exitAlpha: Float = 1f,
+    modifier: Modifier = Modifier
 ) {
     data class NavItem(
         val route: String,
@@ -96,15 +97,20 @@ fun CustomBottomNavigationBar(
         label = "indicator_offset"
     )
 
+    // 隐藏时不可交互，避免遮挡子页面按钮
+    val isInteractable = exitAlpha > 0.5f
+
     // 浮动胶囊容器 + 独立 FAB
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(bottom = bottomInset)
-            .clickable(
-                onClick = {},
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() }
+            .then(
+                if (isInteractable) Modifier.clickable(
+                    onClick = {},
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) else Modifier
             )
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .graphicsLayer {
@@ -125,19 +131,19 @@ fun CustomBottomNavigationBar(
                     .height(72.dp)
                     .shadow(
                         elevation = 12.dp,
-                        shape = RoundedCornerShape(299.dp),
+                        shape = ThemeConstants.NavCapsuleCornerRadius,
                         clip = false,
                         ambientColor = shadowColor,
                         spotColor = shadowColor
                     )
                     .background(
                         color = MaterialTheme.colorScheme.surface.copy(alpha = if (darkTheme) 0.88f else 0.92f),
-                        shape = RoundedCornerShape(299.dp)
+                        shape = ThemeConstants.NavCapsuleCornerRadius
                     )
                     .border(
                         width = 1.2.dp,
                         brush = Brush.linearGradient(colors = borderGradientColors),
-                        shape = RoundedCornerShape(299.dp)
+                        shape = ThemeConstants.NavCapsuleCornerRadius
                     )
                     .padding(horizontal = 8.dp)
             ) {
@@ -149,14 +155,14 @@ fun CustomBottomNavigationBar(
                             .fillMaxHeight()
                             .width(with(density) { itemWidthPx.toDp() })
                             .padding(horizontal = 4.dp, vertical = 6.dp)
-                            .clip(RoundedCornerShape(299.dp))
+                            .clip(ThemeConstants.NavCapsuleCornerRadius)
                             .background(
                                 if (darkTheme) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.08f)
                             )
                             .border(
                                 width = 1.dp,
                                 color = if (darkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.05f),
-                                shape = RoundedCornerShape(299.dp)
+                                shape = ThemeConstants.NavCapsuleCornerRadius
                             )
                     )
                 }
@@ -173,6 +179,7 @@ fun CustomBottomNavigationBar(
                         CapsuleNavItem(
                             selected = index == selectedIndex,
                             onClick = { onNavigate(item.route) },
+                            enabled = isInteractable,
                             activeIcon = item.activeIcon,
                             inactiveIcon = item.inactiveIcon,
                             label = item.label,
@@ -194,7 +201,7 @@ fun CustomBottomNavigationBar(
                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
                 modifier = Modifier
                     .size(56.dp)
-                    .bouncyClickable { onAddClick() }
+                    .then(if (isInteractable) Modifier.bouncyClickable { onAddClick() } else Modifier)
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
@@ -213,6 +220,7 @@ fun CustomBottomNavigationBar(
 private fun RowScope.CapsuleNavItem(
     selected: Boolean,
     onClick: () -> Unit,
+    enabled: Boolean,
     activeIcon: ImageVector,
     inactiveIcon: ImageVector,
     label: String,
@@ -235,9 +243,10 @@ private fun RowScope.CapsuleNavItem(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(299.dp))
+            .clip(ThemeConstants.NavCapsuleCornerRadius)
             .clickable(
                 onClick = onClick,
+                enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ),

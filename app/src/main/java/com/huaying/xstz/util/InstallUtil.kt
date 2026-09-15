@@ -3,7 +3,6 @@ package com.huaying.xstz.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import androidx.core.content.FileProvider
 import java.io.File
 
@@ -27,20 +26,16 @@ object InstallUtil {
     }
 
     /**
-     * 从文件路径安装 APK（适用于 Android 7.0+）
+     * 从文件路径安装 APK
      * @param context 上下文
      * @param file APK 文件
      */
     fun installApkFromFile(context: Context, file: File) {
-        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
-            )
-        } else {
-            Uri.fromFile(file)
-        }
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
 
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")

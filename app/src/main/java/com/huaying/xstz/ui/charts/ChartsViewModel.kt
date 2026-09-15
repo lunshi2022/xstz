@@ -11,12 +11,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.threeten.bp.LocalDate
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.random.Random
 
 enum class TimeRange {
     WEEK, MONTH, YEAR
+}
+
+enum class ChartType {
+    RETURN, ALLOCATION, PERSPECTIVE
 }
 
 sealed interface ChartsUiState {

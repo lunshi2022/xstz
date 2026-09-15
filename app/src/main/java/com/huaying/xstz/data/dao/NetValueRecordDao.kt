@@ -15,6 +15,9 @@ interface NetValueRecordDao {
     @Query("SELECT * FROM net_value_records WHERE createdAt BETWEEN :startTime AND :endTime ORDER BY createdAt DESC")
     fun getRecordsByDateRange(startTime: Long, endTime: Long): Flow<List<NetValueRecord>>
     
+    @Query("SELECT * FROM net_value_records WHERE createdAt < :timestamp ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getRecordBeforeTimestamp(timestamp: Long): NetValueRecord?
+
     @Query("SELECT * FROM net_value_records WHERE createdAt >= :startTime ORDER BY createdAt DESC")
     fun getRecordsSince(startTime: Long): Flow<List<NetValueRecord>>
     

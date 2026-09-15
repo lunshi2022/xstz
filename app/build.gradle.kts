@@ -9,12 +9,18 @@ android {
     namespace = "com.huaying.xstz"
     compileSdk = 34
 
+    signingConfigs {
+        getByName("debug") {
+            // Beta 阶段暂用 Debug 签名，正式版需替换为 Release 签名
+        }
+    }
+
     defaultConfig {
         applicationId = "com.huaying.xstz"
-        minSdk = 24
+        minSdk = 34
         targetSdk = 34
-        versionCode = 160
-        versionName = "1.6.0"
+        versionCode = 166
+        versionName = "1.6.5-Beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -26,6 +32,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -60,12 +67,19 @@ android {
         abortOnError = false
         checkReleaseBuilds = false
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            output.outputFileName = "xstz-v${variant.versionName}.apk"
+        }
+    }
 }
 
 dependencies {
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
 
@@ -89,9 +103,6 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
-    
-    // Security Crypto
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Network
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -108,9 +119,6 @@ dependencies {
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
-
-    // ThreeTenABP for java.time backport
-    implementation("com.jakewharton.threetenabp:threetenabp:1.4.0")
 
     // Hilt
     val hiltVersion = "2.50"

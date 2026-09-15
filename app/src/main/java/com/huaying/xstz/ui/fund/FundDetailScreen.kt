@@ -14,7 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
@@ -43,8 +45,9 @@ import com.huaying.xstz.data.entity.Fund
 import com.huaying.xstz.data.entity.Transaction
 import com.huaying.xstz.data.entity.toDisplayName
 import com.huaying.xstz.data.repository.OperationLogger
+import com.huaying.xstz.util.FormatUtils
+import com.huaying.xstz.util.HoldingsCalculator
 import android.util.Log
-import java.util.Locale
 
 // 引入主题颜色
 import com.huaying.xstz.ui.theme.*
@@ -52,20 +55,6 @@ import com.huaying.xstz.ui.theme.*
 // 分隔线颜色
 private val DarkDividerColor = Color(0xFF2A2A2A)
 private val LightDividerColor = Color(0xFFF0F0F0)
-
-// 安全的数值格式化函数
-private fun safeFormatDouble(value: Double, format: String, defaultValue: String = "0.00"): String {
-    return try {
-        if (value.isNaN() || value.isInfinite()) {
-            defaultValue
-        } else {
-            String.format(Locale.CHINA, format, value)
-        }
-    } catch (e: Exception) {
-        Log.e("FundDetail", "Error formatting value: $value", e)
-        defaultValue
-    }
-}
 
 @Composable
 fun EditTargetRatioDialog(
@@ -77,7 +66,7 @@ fun EditTargetRatioDialog(
 ) {
     val safeCurrentRatio = if (currentRatio.isNaN() || currentRatio.isInfinite()) 0.0 else currentRatio
     var sliderValue by remember { mutableFloatStateOf((safeCurrentRatio * 100).toFloat().coerceIn(0f, 100f)) }
-    var inputValue by remember { mutableStateOf(safeFormatDouble(sliderValue.toDouble(), "%.2f")) }
+    var inputValue by remember { mutableStateOf(FormatUtils.safeFormat(sliderValue.toDouble(), "%.2f")) }
     var isError by remember { mutableStateOf(false) }
 
     val newTotalRatio = if (totalTargetRatio.isNaN() || totalTargetRatio.isInfinite())
@@ -110,7 +99,7 @@ fun EditTargetRatioDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "当前设置: ${safeFormatDouble(currentRatio * 100, "%.2f")}%",
+                    text = "当前设置: ${FormatUtils.safeFormat(currentRatio * 100, "%.2f")}%",
                     color = textPrimaryColor,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -122,7 +111,7 @@ fun EditTargetRatioDialog(
                         value = sliderValue,
                         onValueChange = { newValue ->
                             sliderValue = newValue
-                            inputValue = safeFormatDouble(newValue.toDouble(), "%.2f")
+                            inputValue = FormatUtils.safeFormat(newValue.toDouble(), "%.2f")
                             isError = false
                         },
                         valueRange = 0f..100f,
@@ -149,7 +138,7 @@ fun EditTargetRatioDialog(
                                         indication = null,
                                         onClick = {
                                             sliderValue = preset.toFloat()
-                                            inputValue = safeFormatDouble(preset.toDouble(), "%.0f")
+                                            inputValue = FormatUtils.safeFormat(preset.toDouble(), "%.0f")
                                             isError = false
                                         }
                                     ),
@@ -208,6 +197,7 @@ fun EditTargetRatioDialog(
                                 color = BrandBlue,
                                 textAlign = TextAlign.End
                             ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Number,
@@ -271,7 +261,7 @@ fun EditTargetRatioDialog(
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                "${safeFormatDouble(sliderValue.toDouble(), "%.2f")}%",
+                                "${FormatUtils.safeFormat(sliderValue.toDouble(), "%.2f")}%",
                                 color = textPrimaryColor,
                                 style = MaterialTheme.typography.bodyMedium
                             )
@@ -288,7 +278,7 @@ fun EditTargetRatioDialog(
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                "${safeFormatDouble(if (newTotalRatio.isNaN() || newTotalRatio.isInfinite()) 0.0 else newTotalRatio * 100, "%.2f")}%",
+                                "${FormatUtils.safeFormat(if (newTotalRatio.isNaN() || newTotalRatio.isInfinite()) 0.0 else newTotalRatio * 100, "%.2f")}%",
                                 color = if (isValidTotal) SuccessGreen else DangerRed,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
@@ -383,8 +373,6 @@ fun FundDetailScreen(
     onNavigateToTransactionHistory: () -> Unit,
     onNavigateToTargetAllocation: () -> Unit = {}
 ) {
-    Log.d("FundDetail", "Rendering FundDetailScreen for fund: ${fund.name} (id: ${fund.id})")
-
     // 记录页面查看
     LaunchedEffect(fund.id) {
         OperationLogger.logPageView("基金详情", "${fund.name} (${fund.code})")
@@ -487,10 +475,11 @@ fun FundDetailScreen(
                         )
                     }
                 } else {
-                    DropdownRow(
+                    val currentTypeIndex = assetTypes.indexOf(fund.type).coerceAtLeast(0)
+                    SegmentedButtonTypeRow(
                         label = "类型",
-                        currentValue = fund.type.toDisplayName(),
                         options = assetTypeOptions,
+                        selectedIndex = currentTypeIndex,
                         onOptionSelected = { index ->
                             if (index >= 0 && index < assetTypes.size) {
                                 val oldType = fund.type.toDisplayName()
@@ -511,9 +500,9 @@ fun FundDetailScreen(
                 val quantityValue = if (isPrivacyMode) {
                     "****"
                 } else if (isCash) {
-                    "¥${safeFormatDouble(if (fund.holdingQuantity.isNaN() || fund.holdingQuantity.isInfinite()) 0.0 else fund.holdingQuantity, "%.2f")}"
+                    "¥${FormatUtils.safeFormat(if (fund.holdingQuantity.isNaN() || fund.holdingQuantity.isInfinite()) 0.0 else fund.holdingQuantity, "%.2f")}"
                 } else {
-                    safeFormatDouble(if (fund.holdingQuantity.isNaN() || fund.holdingQuantity.isInfinite()) 0.0 else fund.holdingQuantity, "%.0f")
+                    FormatUtils.safeFormat(if (fund.holdingQuantity.isNaN() || fund.holdingQuantity.isInfinite()) 0.0 else fund.holdingQuantity, "%.0f")
                 }
 
                 Row(
@@ -548,9 +537,7 @@ fun FundDetailScreen(
 
                 if (!isCash) {
                     Spacer(modifier = Modifier.height(20.dp))
-                    val costPrice = if (fund.holdingQuantity > 0.0 && !fund.totalCost.isNaN() && !fund.totalCost.isInfinite() && !fund.holdingQuantity.isNaN() && !fund.holdingQuantity.isInfinite()) {
-                        fund.totalCost / fund.holdingQuantity
-                    } else 0.0
+                    val costPrice = HoldingsCalculator.calculateCostPrice(fund)
 
                     Row(
                         modifier = Modifier.height(100.dp),
@@ -559,26 +546,24 @@ fun FundDetailScreen(
                     ) {
                         PriceBox(
                             label = "成本价格",
-                            value = if (isPrivacyMode) "****" else "¥${safeFormatDouble(if (costPrice.isNaN() || costPrice.isInfinite()) 0.0 else costPrice, "%.3f")}",
+                            value = if (isPrivacyMode) "****" else "¥${FormatUtils.safeFormat(if (costPrice.isNaN() || costPrice.isInfinite()) 0.0 else costPrice, "%.3f")}",
                             change = null,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             isDarkMode = isDarkMode
                         )
 
                         val currentPrice = if (fund.currentPrice.isNaN() || fund.currentPrice.isInfinite()) 0.0 else fund.currentPrice
-                        val priceChange = if (costPrice > 0.0 && !currentPrice.isNaN() && !currentPrice.isInfinite()) {
-                            ((currentPrice - costPrice) / costPrice * 100)
-                        } else 0.0
+                        val priceChange = HoldingsCalculator.calculateReturnRate(currentPrice, costPrice)
                         val safePriceChange = if (priceChange.isNaN() || priceChange.isInfinite()) 0.0 else priceChange
                         val changeText = when {
-                            safePriceChange > 0 -> "+${safeFormatDouble(safePriceChange, "%.2f")}%"
-                            safePriceChange < 0 -> "${safeFormatDouble(safePriceChange, "%.2f")}%"
+                            safePriceChange > 0 -> "+${FormatUtils.safeFormat(safePriceChange, "%.2f")}%"
+                            safePriceChange < 0 -> "${FormatUtils.safeFormat(safePriceChange, "%.2f")}%"
                             else -> "0.00%"
                         }
 
                         PriceBox(
                             label = "当前价格",
-                            value = if (isPrivacyMode) "****" else "¥${safeFormatDouble(if (currentPrice.isNaN() || currentPrice.isInfinite()) 0.0 else currentPrice, "%.3f")}",
+                            value = if (isPrivacyMode) "****" else "¥${FormatUtils.safeFormat(if (currentPrice.isNaN() || currentPrice.isInfinite()) 0.0 else currentPrice, "%.3f")}",
                             change = changeText,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             isDarkMode = isDarkMode
@@ -594,7 +579,7 @@ fun FundDetailScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 val safeTargetRatio = if (fund.targetRatio.isNaN() || fund.targetRatio.isInfinite()) 0.0 else fund.targetRatio
-                val targetRatioValue = if (isPrivacyMode) "**%" else "${safeFormatDouble(safeTargetRatio * 100, "%.2f")}%"
+                val targetRatioValue = if (isPrivacyMode) "**%" else "${FormatUtils.safeFormat(safeTargetRatio * 100, "%.2f")}%"
                 val isGlobalRatioValid = if (totalTargetRatio.isNaN() || totalTargetRatio.isInfinite()) false else kotlin.math.abs(totalTargetRatio - 1.0) < 0.01
 
                 Row(
@@ -644,7 +629,7 @@ fun FundDetailScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "⚠ 所有基金目标总和: ${safeFormatDouble(if (totalTargetRatio.isNaN() || totalTargetRatio.isInfinite()) 0.0 else totalTargetRatio * 100, "%.2f")}%，需调整为100%",
+                                text = "⚠ 所有基金目标总和: ${FormatUtils.safeFormat(if (totalTargetRatio.isNaN() || totalTargetRatio.isInfinite()) 0.0 else totalTargetRatio * 100, "%.2f")}%，需调整为100%",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DangerRed
                             )
@@ -679,29 +664,29 @@ fun FundDetailScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
+                                imageVector = Icons.AutoMirrored.Filled.List,
                                 contentDescription = null,
-                                modifier = Modifier.size(22.dp),
+                                modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             "交易记录",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -710,7 +695,7 @@ fun FundDetailScreen(
                             Text(
                                 "${transactions.size}笔记录",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
                         Spacer(modifier = Modifier.width(4.dp))
@@ -907,88 +892,39 @@ private fun PriceBox(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DropdownRow(
+private fun SegmentedButtonTypeRow(
     label: String,
-    currentValue: String,
     options: List<String>,
+    selectedIndex: Int,
     onOptionSelected: (Int) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
     val textSecondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val textPrimaryColor = MaterialTheme.colorScheme.onSurface
-    val priceBoxColor = MaterialTheme.colorScheme.surface
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { expanded = true },
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             label,
             color = textSecondaryColor,
             style = MaterialTheme.typography.bodyMedium
         )
-        Box {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    currentValue,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = BrandBlue
-                )
-                Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = textSecondaryColor.copy(alpha = 0.7f)
-                )
-            }
-
-            if (expanded) {
-                Popup(
-                    alignment = Alignment.TopEnd,
-                    offset = IntOffset(0, 8),
-                    onDismissRequest = { expanded = false },
-                    properties = PopupProperties(focusable = true)
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = priceBoxColor
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
-                        ) {
-                            options.forEachIndexed { index, option ->
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null
-                                        ) {
-                                            onOptionSelected(index)
-                                            expanded = false
-                                        }
-                                        .padding(horizontal = 20.dp, vertical = 10.dp)
-                                ) {
-                                    Text(
-                                        option,
-                                        color = textPrimaryColor,
-                                        style = if (currentValue == option) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge
-                                    )
-                                }
-                            }
-                        }
+        Spacer(modifier = Modifier.height(8.dp))
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            options.forEachIndexed { index, option ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                    onClick = { onOptionSelected(index) },
+                    selected = index == selectedIndex,
+                    label = {
+                        Text(
+                            option,
+                            fontSize = 13.sp,
+                            fontWeight = if (index == selectedIndex) FontWeight.Medium else FontWeight.Normal
+                        )
                     }
-                }
+                )
             }
         }
     }

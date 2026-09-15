@@ -91,11 +91,27 @@ fun AboutScreen(
                             .padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // v1.6.0 (最新版本)
+                        // v1.6.5 (最新版本)
+                        VersionItem(
+                            version = "v1.6.5",
+                            date = "2026-06-10",
+                            isLatest = true,
+                            changes = listOf(
+                                "重构格式化逻辑，统一抽取为 FormatUtils 与 FormatTemplates，消除多界面重复代码",
+                                "重构持仓计算逻辑，统一抽取为 HoldingsCalculator，供资产概览、基金详情、再平衡等多模块共享",
+                                "集中管理业务常量至 AppConstants，消除散落各处的魔法数字",
+                                "重构再平衡模块，使用迭代收敛算法处理无现金基金场景",
+                                "优化再平衡阈值输入，支持实时持久化与失焦恢复默认值",
+                                "优化再平衡页面预加载数据合成状态，避免导航动画期间布局跳变",
+                                "格式化与计算逻辑从 UI 层下沉至 util 层，提升可测试性"
+                            )
+                        )
+
+                        // v1.6.0
                         VersionItem(
                             version = "v1.6.0",
                             date = "2026-06-08",
-                            isLatest = true,
+                            isLatest = false,
                             changes = listOf(
                                 "新增统一动画系统，涵盖启动屏、加载、列表、导航、交互五大模块",
                                 "新增现代风格启动屏动画，支持品牌渐变与分阶段展示",

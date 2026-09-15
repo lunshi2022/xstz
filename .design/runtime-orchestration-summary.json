@@ -1,0 +1,686 @@
+{
+  "skillProvenance": {
+    "name": "solo-design",
+    "version": "2026.07.22.00.00.00",
+    "version_source": "skill-release-manifest.json"
+  },
+  "project": {
+    "resolvedLane": "library_bound",
+    "operatingMode": "library-bound",
+    "selectedIntentWorkflowRead": true,
+    "contextRequirementsLoaded": [
+      {
+        "path": "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/page-rendering-quality-gate.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/design-artifact-validation.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/delivery-evidence-contract.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "visual-experience/visual-experience-guidelines.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-page-library-bound/INTENT_WORKFLOW.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-page-library-bound/start-library-bound-project.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-page-library-bound/library-bound-page-runtime.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-page-library-bound/dispatch-contract.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-page-library-bound/design-library-ingestion.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-page-library-bound/design-token-fidelity-rules.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-page-library-bound/component-conformance-rules.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-page-library-bound/icon-source-priority-rules.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      }
+    ],
+    "contextReadScope": "library-bound-lane-full",
+    "validationRunDiscipline": "main-agent-only",
+    "lowValueCallWatchdog": {
+      "noProgressNextAction": "proceed-to-dispatch"
+    },
+    "expectedDispatches": [
+      {
+        "nodeId": "page-asset-overview",
+        "pageId": "page-asset-overview",
+        "targetPageId": "page-asset-overview",
+        "htmlSrc": "pages/asset-overview.html",
+        "packetType": "LibraryBoundPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/asset-overview.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "d41d8cd98f00b204e9800998ecf8427e",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-06T14:36:00.648Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "nodeId": "page-fund-detail",
+        "pageId": "page-fund-detail",
+        "targetPageId": "page-fund-detail",
+        "htmlSrc": "pages/fund-detail.html",
+        "packetType": "LibraryBoundPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/fund-detail.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "d41d8cd98f00b204e9800998ecf8427e",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-06T14:36:07.797Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "nodeId": "page-settings",
+        "pageId": "page-settings",
+        "targetPageId": "page-settings",
+        "htmlSrc": "pages/settings.html",
+        "packetType": "LibraryBoundPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/settings.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "d41d8cd98f00b204e9800998ecf8427e",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-06T14:36:09.548Z",
+        "source": "record-dispatch-completion.mjs"
+      }
+    ],
+    "dispatchPreflightManifest": [
+      {
+        "nodeId": "page-asset-overview",
+        "htmlSrc": "pages/asset-overview.html",
+        "packetType": "LibraryBoundPagePacket",
+        "allowedWritePaths": [
+          "pages/asset-overview.html"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/asset-overview.html"
+          ]
+        }
+      },
+      {
+        "nodeId": "page-fund-detail",
+        "htmlSrc": "pages/fund-detail.html",
+        "packetType": "LibraryBoundPagePacket",
+        "allowedWritePaths": [
+          "pages/fund-detail.html"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/fund-detail.html"
+          ]
+        }
+      },
+      {
+        "nodeId": "page-settings",
+        "htmlSrc": "pages/settings.html",
+        "packetType": "LibraryBoundPagePacket",
+        "allowedWritePaths": [
+          "pages/settings.html"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/settings.html"
+          ]
+        }
+      }
+    ],
+    "validationHistory": [
+      {
+        "reportPath": "validation-report.json",
+        "reportHash": "77a69f680fcdbb45530870d1371a9a997d84dc5b94883a6a699039f6cb5bc2d9",
+        "checkedAt": "2026-08-06T14:31:22.296Z",
+        "success": false,
+        "exitCode": 1,
+        "renderBlockingErrorCount": 2,
+        "repairPlanHints": [
+          "hardcoded-color-in-body"
+        ],
+        "errorSignatures": [
+          {
+            "errorClass": "dispatch-preflight-or-ownership",
+            "normalized": "[dispatch-changed-files] page-fund-detail: changed file outside allowedWritePaths[]: pages/asset-overview.html",
+            "signature": "2b9641e91b5e4e2868b792823610ba57a22c93f33e7e4bc0d44f4f994bf75314"
+          },
+          {
+            "errorClass": "dispatch-preflight-or-ownership",
+            "normalized": "[dispatch-changed-files] page-settings: changed file outside allowedWritePaths[]: pages/asset-overview.html",
+            "signature": "0b173de71f6f0c10465c2d762b198c8528ee349e8d250881daca6931924dca9b"
+          }
+        ],
+        "terminalState": null
+      },
+      {
+        "reportPath": "validation-report.json",
+        "reportHash": "7f32e6329365aa624c617c0e1e1b0e28943e6a9893e9b58ddfede068d77077b8",
+        "checkedAt": "2026-08-06T14:36:46.010Z",
+        "success": true,
+        "exitCode": 0,
+        "renderBlockingErrorCount": 0,
+        "repairPlanHints": [
+          "hardcoded-color-in-body"
+        ],
+        "errorSignatures": [],
+        "terminalState": null
+      }
+    ],
+    "validationRepairLedger": [
+      {
+        "failedReportPath": "validation-report.json",
+        "failedReportHash": "77a69f680fcdbb45530870d1371a9a997d84dc5b94883a6a699039f6cb5bc2d9",
+        "repairWorkflowReadPath": "intent-workflows/intent-project-mutation/main-agent-repair-workflow.md",
+        "repairStartedAt": "2026-08-06T14:32:21.542Z",
+        "repairEntryStatus": "revalidated-success",
+        "ownerTriage": [
+          {
+            "owner": "sub-agent",
+            "errorClass": "hardcoded-color-in-body",
+            "affectedFiles": [
+              "settings.html"
+            ],
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once"
+          }
+        ],
+        "repairPlanHints": [
+          {
+            "errorClass": "hardcoded-color-in-body",
+            "owner": "sub-agent",
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once",
+            "affectedFiles": [
+              "settings.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          }
+        ],
+        "repairActions": [
+          {
+            "owner": "main-agent",
+            "errorClass": "dispatch-preflight-or-ownership",
+            "affectedFiles": [
+              "pages/settings.html"
+            ],
+            "action": "re-record-dispatch-completions-with-script",
+            "observedFileHashes": [
+              {
+                "path": "pages/settings.html",
+                "hash": "6987b3a288c34fb1a6bfdb4d5c50db8b14372027664fa7985bb9695c89c3e8d2"
+              }
+            ],
+            "preEditFileHashes": [],
+            "postEditFileHashes": [],
+            "repairOwnedFields": [
+              "dispatch-preflight-or-ownership"
+            ],
+            "recordedAt": "2026-08-06T14:36:40.371Z",
+            "repairActionTableRequired": true
+          }
+        ],
+        "revalidationReportPath": "validation-report.json",
+        "revalidationReportHash": "7f32e6329365aa624c617c0e1e1b0e28943e6a9893e9b58ddfede068d77077b8",
+        "revalidationSuccess": true,
+        "blockedReason": null,
+        "revalidationRecordedAt": "2026-08-06T14:36:55.398Z"
+      }
+    ],
+    "repairEntryEvidence": [
+      {
+        "failedReportPath": "validation-report.json",
+        "failedReportHash": "77a69f680fcdbb45530870d1371a9a997d84dc5b94883a6a699039f6cb5bc2d9",
+        "repairWorkflowReadPath": "intent-workflows/intent-project-mutation/main-agent-repair-workflow.md",
+        "repairStartedAt": "2026-08-06T14:32:21.542Z",
+        "ledgerIndex": 0,
+        "ownerTriageCount": 1,
+        "repairActionCount": 1,
+        "revalidationReportPath": "validation-report.json",
+        "revalidationReportHash": "7f32e6329365aa624c617c0e1e1b0e28943e6a9893e9b58ddfede068d77077b8",
+        "revalidationSuccess": true
+      }
+    ],
+    "mainAgentPostDispatchMutations": [
+      {
+        "path": "pages/asset-overview.html",
+        "reason": "app-shell viewport and scroll region fixes applied by main agent post-dispatch",
+        "owner": "main-agent",
+        "recordedAt": "2026-08-06T14:32:58.013Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "path": "colors_and_type.css",
+        "reason": "radius aliases added by main agent post-dispatch",
+        "owner": "main-agent",
+        "recordedAt": "2026-08-06T14:32:58.013Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "path": "pages/fund-detail.html",
+        "reason": "app-shell viewport and scroll region fixes applied by main agent post-dispatch",
+        "owner": "main-agent",
+        "recordedAt": "2026-08-06T14:33:07.293Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "path": "pages/settings.html",
+        "reason": "app-shell viewport and scroll region fixes applied by main agent post-dispatch",
+        "owner": "main-agent",
+        "recordedAt": "2026-08-06T14:33:09.529Z",
+        "source": "record-dispatch-completion.mjs"
+      }
+    ]
+  },
+  "designSource": {
+    "libraryIdentity": {
+      "name": "苹果",
+      "id": "dl_builtin_apple",
+      "version": null,
+      "scope": "built-in-global",
+      "path": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple",
+      "versionSource": "metadata.json"
+    },
+    "brandPrefix": "apple",
+    "cssPath": "colors_and_type.css",
+    "actualTokenNameReference": [
+      "--apple-background",
+      "--apple-foreground",
+      "--apple-card",
+      "--apple-card-foreground",
+      "--apple-popover",
+      "--apple-popover-foreground",
+      "--apple-primary",
+      "--apple-primary-foreground",
+      "--apple-secondary",
+      "--apple-secondary-foreground",
+      "--apple-muted",
+      "--apple-muted-foreground",
+      "--apple-accent",
+      "--apple-accent-foreground",
+      "--apple-destructive",
+      "--apple-destructive-foreground",
+      "--apple-border",
+      "--apple-input",
+      "--apple-ring",
+      "--apple-chart-1",
+      "--apple-chart-2",
+      "--apple-chart-3",
+      "--apple-chart-4",
+      "--apple-chart-5",
+      "--apple-sidebar",
+      "--apple-sidebar-foreground",
+      "--apple-sidebar-primary",
+      "--apple-sidebar-primary-foreground",
+      "--background",
+      "--foreground",
+      "--card",
+      "--card-foreground",
+      "--popover",
+      "--popover-foreground",
+      "--primary",
+      "--primary-foreground",
+      "--secondary",
+      "--secondary-foreground",
+      "--muted",
+      "--muted-foreground",
+      "--accent",
+      "--accent-foreground",
+      "--destructive",
+      "--destructive-foreground",
+      "--success",
+      "--success-foreground",
+      "--border",
+      "--input",
+      "--ring",
+      "--icon",
+      "--icon-muted",
+      "--chart-1",
+      "--chart-2",
+      "--chart-3",
+      "--chart-4",
+      "--chart-5",
+      "--sidebar",
+      "--sidebar-foreground",
+      "--sidebar-primary",
+      "--sidebar-primary-foreground",
+      "--sidebar-accent",
+      "--sidebar-accent-foreground",
+      "--sidebar-border",
+      "--sidebar-ring",
+      "--font-sans",
+      "--font-serif",
+      "--font-mono",
+      "--tracking-normal",
+      "--radius",
+      "--shadow-2xs",
+      "--shadow-xs",
+      "--shadow-sm",
+      "--shadow",
+      "--shadow-md",
+      "--shadow-lg",
+      "--shadow-xl",
+      "--shadow-2xl",
+      "--spacing",
+      "--brand-50",
+      "--brand-100",
+      "--brand-200",
+      "--brand-300",
+      "--brand-400",
+      "--brand-500",
+      "--brand-600",
+      "--brand-700",
+      "--brand-800",
+      "--brand-900",
+      "--background-50",
+      "--background-100",
+      "--background-200",
+      "--background-300",
+      "--background-400",
+      "--background-500",
+      "--background-600",
+      "--background-700",
+      "--background-800",
+      "--background-900",
+      "--text-50",
+      "--text-100",
+      "--text-200",
+      "--text-300",
+      "--text-400",
+      "--text-500",
+      "--text-600",
+      "--text-700",
+      "--text-800",
+      "--text-900",
+      "--state-success",
+      "--state-success-dark",
+      "--state-success-surface",
+      "--state-success-foreground",
+      "--state-error",
+      "--state-error-dark",
+      "--state-error-surface",
+      "--state-error-foreground"
+    ],
+    "designDecisionSummary": "Apple-inspired restrained design: System Blue #007AFF primary, #FFFFFF/#000000 backgrounds, #1D1D1F/#8E8E93 text, #34C759 success, #FF3B30 error. DM Sans typography. 19.2px radius (1.2rem). 3.84px spacing base (0.24rem). Whisper-light shadows (0 1px 2px rgba(0,0,0,0.04) at rest). Pill-shaped buttons (fully rounded). 1px border defines card edges. Mobile tab bar with blur and safe-area awareness.",
+    "componentIndexSummary": [
+      {
+        "slug": "button",
+        "category": "actions",
+        "summary": "Capsule-shaped actions with restrained Apple-inspired hierarchy"
+      },
+      {
+        "slug": "card",
+        "category": "surfaces",
+        "summary": "Quiet containers defined by border and spacing, not decoration"
+      },
+      {
+        "slug": "input",
+        "category": "forms",
+        "summary": "Simple rounded inputs with readable placeholder contrast and visible focus"
+      },
+      {
+        "slug": "navigation",
+        "category": "navigation",
+        "summary": "Apple-store-like navigation with black top bar and restrained secondary rails"
+      },
+      {
+        "slug": "product-grid",
+        "category": "commerce",
+        "summary": "Four-column merchandising matrix with editorial spacing"
+      },
+      {
+        "slug": "comparison-table",
+        "category": "data-display",
+        "summary": "Model comparison cards with calm visual structure"
+      }
+    ],
+    "uiKitSummary": "Website UI Kit at ui_kits/website/index.html — Apple store-like layout reference",
+    "allowedComponents": [
+      "button",
+      "card",
+      "comparison-table",
+      "input",
+      "navigation",
+      "product-grid"
+    ],
+    "forbiddenInventedComponents": [],
+    "iconAssets": {
+      "source": "assets/icons",
+      "projectIconDir": "assets/icons/dl_builtin_apple",
+      "libraryKey": "dl_builtin_apple",
+      "renderMethod": "css-mask",
+      "pathTemplate": "../assets/icons/dl_builtin_apple/{name}.svg",
+      "availableNames": [
+        "arrow-down",
+        "arrow-left",
+        "arrow-right",
+        "arrow-up",
+        "box",
+        "check",
+        "chevron-down",
+        "chevron-left",
+        "chevron-right",
+        "chevron-up",
+        "chevrons-down-up",
+        "chevrons-up-down",
+        "circle-alert",
+        "circle-check",
+        "circle-minus",
+        "circle-pause",
+        "circle-play",
+        "circle-plus",
+        "circle-question-mark",
+        "external-link",
+        "file",
+        "folder-open",
+        "folder",
+        "funnel",
+        "grip",
+        "heart",
+        "house",
+        "mail",
+        "map-pin",
+        "message-circle-more",
+        "mouse-pointer-click",
+        "pen-line",
+        "send-horizontal",
+        "star",
+        "tag",
+        "thumbs-down",
+        "thumbs-up",
+        "trash-2",
+        "triangle-alert",
+        "user"
+      ],
+      "totalCount": 39,
+      "coloringRule": "currentColor by default; override with Library token when needed"
+    }
+  },
+  "pages": [
+    {
+      "nodeId": "page-asset-overview",
+      "htmlSrc": "pages/asset-overview.html",
+      "title": "资产概览",
+      "deviceType": "mobile",
+      "viewportMode": "app-shell",
+      "cssPath": "colors_and_type.css",
+      "brandPrefix": "apple",
+      "tokenFidelity": "strict",
+      "componentConformance": true,
+      "componentPlan": [
+        {
+          "slug": "card",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-card.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\card.json"
+        },
+        {
+          "slug": "button",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-button.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\button.json"
+        },
+        {
+          "slug": "navigation",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-navigation.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\navigation.json"
+        }
+      ],
+      "uiKitPath": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\ui_kits\\website\\index.html",
+      "themeMode": "light"
+    },
+    {
+      "nodeId": "page-fund-detail",
+      "htmlSrc": "pages/fund-detail.html",
+      "title": "基金详情",
+      "deviceType": "mobile",
+      "viewportMode": "app-shell",
+      "cssPath": "colors_and_type.css",
+      "brandPrefix": "apple",
+      "tokenFidelity": "strict",
+      "componentConformance": true,
+      "componentPlan": [
+        {
+          "slug": "card",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-card.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\card.json"
+        },
+        {
+          "slug": "button",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-button.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\button.json"
+        },
+        {
+          "slug": "navigation",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-navigation.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\navigation.json"
+        }
+      ],
+      "uiKitPath": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\ui_kits\\website\\index.html",
+      "themeMode": "light"
+    },
+    {
+      "nodeId": "page-settings",
+      "htmlSrc": "pages/settings.html",
+      "title": "设置",
+      "deviceType": "mobile",
+      "viewportMode": "app-shell",
+      "cssPath": "colors_and_type.css",
+      "brandPrefix": "apple",
+      "tokenFidelity": "strict",
+      "componentConformance": true,
+      "componentPlan": [
+        {
+          "slug": "card",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-card.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\card.json"
+        },
+        {
+          "slug": "button",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-button.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\button.json"
+        },
+        {
+          "slug": "navigation",
+          "contractKind": "legacy-json",
+          "previewFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\preview\\component-navigation.html",
+          "contractFile": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\components\\navigation.json"
+        }
+      ],
+      "uiKitPath": "c:\\Users\\21063\\.trae-cn\\design_libraries\\dl_builtin_apple\\ui_kits\\website\\index.html",
+      "themeMode": "light"
+    }
+  ]
+}
