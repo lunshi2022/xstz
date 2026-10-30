@@ -70,4 +70,11 @@ subprojects {
             }
         }
     }
+
+    // --- 单测任务 ---
+    // Gradle 9 默认对"有测试源目录但没发现用例"的模块判失败。
+    // 多模块项目里，先建目录后写测试是常态，这条默认值会让空模块直接卡住构建。
+    tasks.withType<Test>().configureEach {
+        failOnNoDiscoveredTests = false
+    }
 }
