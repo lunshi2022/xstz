@@ -1,41 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        应用主主题
-        适配状态栏和导航栏，与App深色风格一致
+      基础主题只负责「窗口这一层」：背景色、透明系统栏、edge-to-edge。
+      所有视觉（玻璃、模糊、超椭圆）都由 Compose 的 XstzTheme 负责，两边不重叠。
     -->
-    <style name="Theme.InvestmentManager" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- 状态栏透明，与App背景融合 -->
+    <style name="Theme.Xstz" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/xstz_window_light</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <!-- 导航栏透明 -->
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <!-- 浅色主题下状态栏使用深色图标 -->
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
-        <!-- 确保内容延伸到状态栏下方 -->
-        <item name="android:windowTranslucentStatus">false</item>
-        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
     </style>
 
-    <!--
-        启动主题 - 使用 Android 12+ 原生 SplashScreen API
-        minSdk=34，所有设备均支持原生 SplashScreen
-    -->
-    <style name="Theme.AppSplash" parent="Theme.InvestmentManager">
-        <!-- 窗口背景 - 使用与Logo配色协调的深色背景 -->
-        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
-
-        <!-- 启动图标 -->
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-
-        <!-- 图标背景色 -->
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_icon_background</item>
-
-        <!-- 动画时长 -->
-        <item name="android:windowSplashScreenAnimationDuration">300</item>
-
-        <!-- 启动屏期间状态栏处理 -->
-        <item name="android:statusBarColor">@color/splash_background</item>
-        <item name="android:navigationBarColor">@color/splash_background</item>
+    <!-- 原生 Splash：minSdk 34 → API 31+ 的 splash attrs 直接可用，无需 core-splashscreen -->
+    <style name="Theme.Xstz.Splash" parent="Theme.Xstz">
+        <item name="android:windowSplashScreenBackground">@color/xstz_window_light</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenAnimationDuration">280</item>
     </style>
 </resources>

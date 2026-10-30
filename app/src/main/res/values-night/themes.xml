@@ -1,26 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 夜间模式主主题 -->
-    <style name="Theme.InvestmentManager" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- 状态栏透明，与App背景融合 -->
+    <style name="Theme.Xstz" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/xstz_window_dark</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <!-- 导航栏透明 -->
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <!-- 深色主题下状态栏使用浅色图标 -->
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
-        <!-- 确保内容延伸到状态栏下方 -->
-        <item name="android:windowTranslucentStatus">false</item>
-        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
     </style>
 
-    <!-- 夜间模式启动主题 - 使用 Android 12+ 原生 SplashScreen API -->
-    <style name="Theme.AppSplash" parent="Theme.InvestmentManager">
-        <item name="android:windowSplashScreenBackground">@color/splash_background_dark</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_icon_background_dark</item>
-        <item name="android:windowSplashScreenAnimationDuration">300</item>
-        <item name="android:statusBarColor">@color/splash_background_dark</item>
-        <item name="android:navigationBarColor">@color/splash_background_dark</item>
+    <style name="Theme.Xstz.Splash" parent="Theme.Xstz">
+        <item name="android:windowSplashScreenBackground">@color/xstz_window_dark</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenAnimationDuration">280</item>
     </style>
 </resources>

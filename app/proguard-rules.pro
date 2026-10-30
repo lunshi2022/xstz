@@ -1,47 +1,63 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# XSTZ / InvestmentManager —— R8 规则
 #
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# 三个必须保留的区域，删任何一条都会在 release 包里炸：
+#   1. kotlinx.serialization 生成的序列化器（反射查 $serializer）
+#   2. Room 生成的实现类（按类名反射加载 _Impl）
+#   3. Hilt 生成的组件与 @InstallIn 模块
+#
+# 注意 AGP 9 收紧了 -keepattributes 语义：旧的 "*Annotation*" 不再保留 runtime-invisible 注解，
+# 需要精确保留 RuntimeVisibleAnnotations。
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+-keepattributes Signature,InnerClasses,EnclosingMethod
+-keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations,AnnotationDefault
+-keepattributes *Annotation*
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# ---------------- kotlinx.serialization ----------------
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.huaying.xstz.**$$serializer { *; }
+-keepclassmembers class com.huaying.xstz.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.huaying.xstz.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+# 保留 @Serializable 标注的类自身（R8 会裁掉只被序列化器引用的 data class 的构造器）
+-keep @kotlinx.serialization.Serializable class com.huaying.xstz.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
-
-# Room
--keep class * extends androidx.room.RoomDatabase
+# ---------------- Room ----------------
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep @androidx.room.Entity class * { *; }
 -dontwarn androidx.room.paging.**
 
-# Retrofit
--dontwarn retrofit2.**
--keep class retrofit2.** { *; }
--keepattributes Signature, InnerClasses, EnclosingMethod
+# ---------------- Hilt / Dagger ----------------
+-keep class dagger.hilt.** { *; }
+-keep class javax.inject.** { *; }
+-keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
+-dontwarn dagger.hilt.**
 
-# Gson
--keep class com.google.gson.** { *; }
--keepattributes Signature
--keepattributes *Annotation*
--keep class com.huaying.xstz.data.model.** { *; }
+# ---------------- OkHttp / Okio ----------------
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
 
-# Coroutines
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
--keepclassmembernames class kotlinx.coroutines.android.HandlerContext {
-    volatile <fields>;
+# ---------------- password4j（备份口令派生）----------------
+-keep class com.password4j.** { *; }
+-dontwarn com.password4j.**
+
+# ---------------- 本项目反射入口 ----------------
+# 崩溃诊断读 ApplicationExitInfo，不涉及反射；此处仅保留枚举 valueOf 场景
+-keepclassmembers enum com.huaying.xstz.** {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
 }
 
-# Keep line numbers for better crash reports (optional but recommended)
+# 保留行号，崩溃栈才有意义（配合 mapping.txt 还原）
 -keepattributes SourceFile,LineNumberTable
-
+-renamesourcefileattribute SourceFile

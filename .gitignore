@@ -34,3 +34,20 @@ Thumbs.db
 .trae/
 *.apk
 *.aab
+
+# ===== 签名与密钥（严禁入库）=====
+.signing/
+keystore.properties
+*.jks
+*.keystore
+*.p12
+
+# ===== 构建与本地产物 =====
+.kotlin/
+local.properties
+captures/
+*.hprof
+
+# ===== 模拟器与验收产物 =====
+artifacts/screenshots/
+artifacts/apk/

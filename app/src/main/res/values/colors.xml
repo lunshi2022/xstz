@@ -1,20 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
-
-    <!-- 应用背景色 - 浅色模式 -->
-    <color name="background_light">#F5F5F5</color>
-    <color name="background_dark">#121212</color>
-
-    <!--
-        启动屏专用颜色
-        与原有Logo（先生投资金色图标）配色协调
-    -->
-    <!-- 启动屏背景 - 使用白色背景衬托金色Logo -->
-    <color name="splash_background">#FFFFFFFF</color>
-    <color name="splash_background_dark">#FFFFFFFF</color>
-
-    <!-- 启动图标背景 - 与金色Logo协调的白色 -->
-    <color name="splash_icon_background">#FFFFFFFF</color>
-    <color name="splash_icon_background_dark">#FFFFFFFF</color>
+    <!-- 窗口底色：与 Compose 侧 MeshBackground 的基色保持一致，避免启动瞬间闪白/闪黑 -->
+    <color name="xstz_window_light">#EEF1F7</color>
+    <color name="xstz_window_dark">#080B12</color>
+    <color name="xstz_icon_background">#0B1220</color>
+    <color name="xstz_accent">#3A6FF7</color>
 </resources>
