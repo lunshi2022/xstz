@@ -45,25 +45,35 @@ object XstzColors {
         val glassShadow = Color(0x14000000)
 
         val textPrimary = Color(0xFF11151C)
-        val textSecondary = Color(0xFF5A6478)
-        val textTertiary = Color(0xFF8E98AB)
-        val divider = Color(0x14000000)
+        val textSecondary = Color(0xFF4A5468)
+        // 浅色下原 #8E98AB 在灰玻璃上对比度不足（截图中"当日盈亏"几乎看不见）
+        val textTertiary = Color(0xFF6B7688)
+        val divider = Color(0x1A000000)
     }
 
     // ---------------- 深色 ----------------
+    /**
+     * 深色玻璃的关键是"低白色 + 高描边"。
+     *
+     * 实测教训：初版用 0x33FFFFFF（20% 白）叠在 #080B12 上，
+     * 合成结果 ≈ #393939 的中灰，看起来是一块不透明塑料，
+     * 完全没有"深色玻璃"该有的通透感（截图为证）。
+     * 降到 8% 后背景能透出来，再用 24% 的描边勾出玻璃边缘厚度。
+     */
     object Dark {
         val background = Color(0xFF080B12)
         val backgroundElevated = Color(0xFF10151F)
 
-        val glassFill = Color(0x33FFFFFF)
-        val glassFillStrong = Color(0x52FFFFFF)
-        val glassStroke = Color(0x2EFFFFFF)
-        val glassShadow = Color(0x66000000)
+        val glassFill = Color(0x14FFFFFF)
+        val glassFillStrong = Color(0x26FFFFFF)
+        val glassStroke = Color(0x3DFFFFFF)
+        val glassShadow = Color(0x80000000)
 
         val textPrimary = Color(0xFFF2F5FA)
-        val textSecondary = Color(0xFFA8B2C4)
-        val textTertiary = Color(0xFF6E7889)
-        val divider = Color(0x1FFFFFFF)
+        // 深色下次要文字必须够亮，否则叠在灰玻璃上直接消失
+        val textSecondary = Color(0xFFC6CEDA)
+        val textTertiary = Color(0xFF98A2B3)
+        val divider = Color(0x26FFFFFF)
     }
 
     /** 光斑配色：三组互补色，叠在背景上形成柔和的流动感 */

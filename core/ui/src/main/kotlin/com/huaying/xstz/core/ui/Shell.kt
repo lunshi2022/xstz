@@ -104,7 +104,9 @@ private fun TabItem(
         label = "tabScale",
     )
     val alpha by animateFloatAsState(
-        targetValue = if (selected) 1f else 0.55f,
+        // 0.55 太低：实测截图里未选中的"持仓/走势/再平衡/设置"几乎看不见。
+        // 0.85 仍能区分主次（选中项还有颜色与缩放差异），但保证可读。
+        targetValue = if (selected) 1f else 0.85f,
         animationSpec = spring(stiffness = Spring.StiffnessLow),
         label = "tabAlpha",
     )

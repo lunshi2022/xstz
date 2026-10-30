@@ -66,6 +66,7 @@ fun XstzApp(
                                 onRefresh = vm::refresh,
                                 onTogglePrivacy = vm::togglePrivacy,
                                 onOpenHolding = { /* 详情页在阶段 3 后续批次接入 */ },
+                                onSeedSamples = vm::seedSamples,
                             )
                         }
                         else -> PlaceholderTab(tab)

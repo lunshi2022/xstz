@@ -25,6 +25,15 @@ object XstzType {
     /** 数字专用：等宽，用于金额、净值、涨跌幅 */
     private val numeric = FontFamily.Monospace
 
+    /**
+     * 正文用显式 SansSerif，**不能用 FontFamily.Default**。
+     *
+     * 实测（API 36 模拟器截图）：FontFamily.Default 会让中文回退到衬线体，
+     * "概览""还没有持仓" 全部渲染成宋体观感，与 iOS 的无衬线体系完全不搭。
+     * 显式指定 SansSerif 才会稳定命中 Noto Sans CJK。
+     */
+    private val sans = FontFamily.SansSerif
+
     private val tightLineHeight = LineHeightStyle(
         alignment = LineHeightStyle.Alignment.Center,
         trim = LineHeightStyle.Trim.None,
@@ -37,7 +46,7 @@ object XstzType {
         letterSpacing: Double = 0.0,
         tabular: Boolean = false,
     ) = TextStyle(
-        fontFamily = if (tabular) numeric else FontFamily.Default,
+        fontFamily = if (tabular) numeric else sans,
         fontWeight = weight,
         fontSize = size.sp,
         lineHeight = lineHeight.sp,

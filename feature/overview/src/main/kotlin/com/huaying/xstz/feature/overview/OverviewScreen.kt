@@ -43,6 +43,7 @@ import com.huaying.xstz.core.model.Holding
 import com.huaying.xstz.core.model.Money
 import com.huaying.xstz.core.ui.ChangeText
 import com.huaying.xstz.core.ui.EmptyState
+import com.huaying.xstz.core.ui.GlassPrimaryButton
 import com.huaying.xstz.core.ui.HairlineDivider
 import com.huaying.xstz.core.ui.LargeTitleHeader
 import com.huaying.xstz.core.ui.SectionHeader
@@ -66,6 +67,7 @@ fun OverviewScreen(
     onRefresh: () -> Unit,
     onTogglePrivacy: () -> Unit,
     onOpenHolding: (Long) -> Unit,
+    onSeedSamples: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val palette = XstzTheme.palette
@@ -203,6 +205,13 @@ fun OverviewScreen(
                 EmptyState(
                     title = "还没有持仓",
                     hint = "添加第一只基金后，这里会显示实时市值与盈亏",
+                    action = {
+                        GlassPrimaryButton(
+                            text = "载入示例数据",
+                            onClick = onSeedSamples,
+                            modifier = Modifier.fillMaxWidth(0.6f),
+                        )
+                    },
                 )
             }
         } else {
@@ -279,6 +288,23 @@ fun AllocationRing(
         val inset = stroke / 2
         val arcSize = Size(size.width - stroke, size.height - stroke)
         val topLeft = Offset(inset, inset)
+
+        val hasData = ratios.values.any { it > 0.0005 }
+        if (!hasData) {
+            // 空态：只画一圈极淡的细线占位。
+            // 之前用 divider.copy(alpha=0.5f) —— copy 会把原本 10% 的黑提升到 50%，
+            // 截图上就成了一圈突兀的深灰粗环。这里直接用 divider 本身，并收细到 0.22。
+            drawArc(
+                color = palette.divider,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke * 0.22f, cap = StrokeCap.Butt),
+            )
+            return@Canvas
+        }
 
         // 底环：即使没有数据也能看出"这里是一个环"
         drawArc(

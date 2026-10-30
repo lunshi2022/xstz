@@ -68,7 +68,9 @@ val LightPalette = XstzPalette(
     accent = XstzColors.Accent,
     up = XstzColors.Up,
     down = XstzColors.Down,
-    flat = XstzColors.Flat,
+    // 平盘色用次级文字色而非固定的 #8A93A6：
+    // 截图里 "+¥0.00" 用那个灰在中灰玻璃上完全糊掉，看不出数字
+    flat = XstzColors.Light.textTertiary,
     mesh = XstzColors.meshLight,
 )
 
@@ -87,7 +89,7 @@ val DarkPalette = XstzPalette(
     accent = XstzColors.AccentSoft,
     up = XstzColors.Up,
     down = XstzColors.Down,
-    flat = XstzColors.Flat,
+    flat = XstzColors.Dark.textTertiary,
     mesh = XstzColors.meshDark,
 )
 

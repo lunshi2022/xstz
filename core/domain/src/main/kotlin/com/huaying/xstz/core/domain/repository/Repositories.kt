@@ -23,6 +23,16 @@ interface HoldingRepository {
     suspend fun updateTargetRatio(id: Long, ratio: Double)
     suspend fun deleteHolding(id: Long)
     suspend fun refreshQuotes(): RefreshResult
+
+    /**
+     * 灌入一组示例持仓，用于首次体验与 UI 验收。
+     *
+     * 放在仓储接口而不是 UI 层：示例数据要写库、要触发净值历史，
+     * 这些属于数据职责，UI 只负责触发。
+     *
+     * @return 实际写入的持仓数量
+     */
+    suspend fun seedSampleData(): Int
 }
 
 data class RefreshResult(

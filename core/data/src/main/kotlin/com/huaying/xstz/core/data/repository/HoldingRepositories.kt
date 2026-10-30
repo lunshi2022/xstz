@@ -102,6 +102,75 @@ class HoldingRepositoryImpl @Inject constructor(
     }
 
     /**
+     * 灌入示例持仓。
+     *
+     * 用 SampleData 里那套确定性曲线（同 code 每次生成同样的净值序列），
+     * 所以截图和手工验收可以复现，不会每次看到不同的图形。
+     *
+     * 净值历史一次性写 180 天，让走势图有足够的数据可画。
+     */
+    override suspend fun seedSampleData(): Int {
+        val now = System.currentTimeMillis()
+        val today = LocalDate.now().toEpochDay()
+        var count = 0
+
+        for ((index, s) in SampleData.funds.withIndex()) {
+            val existing = holdingDao.getByCode(s.code)
+            val id = existing?.id ?: holdingDao.insert(
+                com.huaying.xstz.core.database.entity.HoldingEntity(
+                    code = s.code,
+                    name = s.name,
+                    type = s.type.name,
+                    sharesMicros = 0,
+                    costMicros = 0,
+                    navMicros = 0,
+                    prevNavMicros = 0,
+                    targetRatio = s.targetRatio,
+                    navEpochDay = 0,
+                    sortOrder = index,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+
+            holdingDao.updateQuote(
+                id = id,
+                navMicros = Nav.fromDouble(s.nav).micros,
+                prevNavMicros = Nav.fromDouble(s.prevNav).micros,
+                epochDay = today,
+                now = now,
+            )
+            // 份额与成本要单独写：updateQuote 刻意不碰这两个字段
+            val holding = holdingDao.getById(id)
+            if (holding != null) {
+                holdingDao.update(
+                    holding.copy(
+                        sharesMicros = Shares.fromDouble(s.shares).micros,
+                        costMicros = Money.fromYuan(s.costPerShare * s.shares).micros,
+                        updatedAt = now,
+                    )
+                )
+            }
+
+            // 180 天净值历史
+            val points = s.history.mapIndexed { i, value ->
+                NavPoint(epochDay = today - (s.history.size - 1 - i), nav = Nav.fromDouble(value))
+            }
+            navRepository.saveHistory(id, points)
+            count++
+        }
+
+        transactionDao.insertLog(
+            OperationLogEntity(
+                action = "SEED_SAMPLE",
+                detail = "载入 $count 只示例基金及其净值历史",
+                createdAt = now,
+            )
+        )
+        return count
+    }
+
+    /**
      * 刷新全部持仓行情。
      *
      * 降级链：真实接口 → 内存缓存 → 离线样例。
@@ -111,7 +180,9 @@ class HoldingRepositoryImpl @Inject constructor(
     override suspend fun refreshQuotes(): RefreshResult {
         val holdings = holdingDao.getAll()
         if (holdings.isEmpty()) {
-            return RefreshResult(0, 0, DataSource.LIVE, "没有持仓")
+            // 空组合不是"异常"，不需要往界面上抛一句话。
+            // 之前返回 "没有持仓"，结果首页底部多出一行无意义的灰字（截图为证）。
+            return RefreshResult(0, 0, DataSource.LIVE, null)
         }
         val now = System.currentTimeMillis()
         val today = LocalDate.now().toEpochDay()

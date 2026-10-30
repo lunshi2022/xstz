@@ -97,6 +97,25 @@ class OverviewViewModel @Inject constructor(
         message.value = null
     }
 
+    /**
+     * 载入示例持仓。
+     *
+     * 存在的理由不是"演示炫技"，而是空界面下无法验证任何东西：
+     * 列表行高、占比环形图、数字对齐、涨跌配色全都要有数据才看得出对错。
+     */
+    fun seedSamples() {
+        viewModelScope.launch {
+            refreshing.value = true
+            val result = runCatching { holdingRepository.seedSampleData() }
+            refreshing.value = false
+            result.onSuccess { n ->
+                message.value = "已载入 $n 只示例基金"
+            }.onFailure {
+                message.value = "载入失败：${it.message ?: "未知错误"}"
+            }
+        }
+    }
+
     fun togglePrivacy() {
         viewModelScope.launch {
             settings.setPrivacyMode(!state.value.privacy)
