@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
@@ -37,7 +38,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.huaying.xstz.core.common.Formats
 import com.huaying.xstz.core.designsystem.shape.SquircleShape
 import com.huaying.xstz.core.designsystem.theme.XstzTheme
@@ -188,8 +191,17 @@ fun OverviewScreen(
                     Spacer(Modifier.height(10.dp))
                     // 本金必须与盈亏并列：只有市值与收益时，用户无法回答"我到底投了多少"，
                     // 也容易把累计收益误读成本金（方案 §5.1 P0 第 1 项明确列举"本金"）。
-                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    //
+                    // 三列必须**等宽**（weight 1f）。原先没写 weight，Row 按顺序给每个孩子
+                    // 分配"剩余宽度"，前两列按自然宽度占满后，第三列只剩零头——
+                    // 实测第三列的「+¥6,043.25」被挤成 `+` / `¥6,043` / `.25` 三行，
+                    // **金额从中间断开**，极易被误读成两个数字（TEST_PLAN T-007）。
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
                         MetricColumn(
+                            modifier = Modifier.weight(1f),
                             label = "本金",
                             value = if (state.privacy) Formats.PRIVACY_MASK
                             else Formats.currency(state.summary.totalCost.toYuan()),
@@ -198,6 +210,7 @@ fun OverviewScreen(
                             subColor = palette.textTertiary,
                         )
                         MetricColumn(
+                            modifier = Modifier.weight(1f),
                             label = "当日盈亏",
                             value = if (state.privacy) "****"
                             else Formats.signedCurrency(state.summary.dayProfit.toYuan()),
@@ -206,6 +219,7 @@ fun OverviewScreen(
                             subColor = palette.change(state.summary.dayProfitRate),
                         )
                         MetricColumn(
+                            modifier = Modifier.weight(1f),
                             label = "累计收益",
                             value = if (state.privacy) "****"
                             else Formats.signedCurrency(state.summary.totalProfit.toYuan()),
@@ -315,14 +329,40 @@ private fun MetricColumn(
     valueColor: Color,
     sub: String,
     subColor: Color,
+    modifier: Modifier = Modifier,
 ) {
     val palette = XstzTheme.palette
-    Column {
-        Text(label, style = XstzType.caption, color = palette.textTertiary)
+    Column(modifier) {
+        Text(label, style = XstzType.caption, color = palette.textTertiary, maxLines = 1)
         Spacer(Modifier.height(2.dp))
-        Text(value, style = XstzType.numericM, color = valueColor)
+        /*
+         * 金额永远不能折行。
+         *
+         * 三列等宽后每列约 96~113dp（取决于屏宽），而「+¥1,284,450.00」在 20sp 下要 ~160dp。
+         * 这里的处理顺序是：
+         *   1. softWrap=false + maxLines=1 —— 从机制上禁止金额被拆成两行；
+         *   2. autoSize 20sp → 12sp —— 放不下就整列等比缩小，先保住"能读全"；
+         *   3. 缩到 12sp 仍放不下才 Ellipsis —— 截断时留省略号，让它**看起来就是被截断的**。
+         *
+         * 为什么最后宁可省略号也不让它折行：折行会把「+¥6,043.25」拆成
+         * 「+」「¥6,043」「.25」，这在金融界面上会被读成两个数（TEST_PLAN T-007）。
+         * 截断至少还能看出"后面还有"，而把小数点拆到下一行是纯粹的误导。
+         */
+        Text(
+            text = value,
+            style = XstzType.numericM,
+            color = valueColor,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(
+                minFontSize = 12.sp,
+                maxFontSize = 20.sp,
+                stepSize = 0.5.sp,
+            ),
+        )
         if (sub.isNotEmpty()) {
-            Text(sub, style = XstzType.numericXS, color = subColor)
+            Text(sub, style = XstzType.numericXS, color = subColor, maxLines = 1)
         }
     }
 }
