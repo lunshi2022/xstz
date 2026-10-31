@@ -1,0 +1,17 @@
+feat(emulator): 用 explorer 打开 bat 实现自主启动，修复列表遮挡与来源标注
+
+启动方式的关键发现：qemu 必须拥有自己的控制台。一旦继承 agent 的 stdout 管道，
+就会冻结在日志第 4396 字节（与 GPU/加速参数无关，六组组合均停在同一偏移）。
+逐条排除 bash 后台、Start-Process、Process.Start、schtasks、COM WScript.Shell、
+命令行解释器直调之后，explorer.exe 打开 .bat 是唯一可行路径——等价于双击，
+由 shell 创建独立进程与独立控制台。实测启动成功（qemu 3734MB，5554 监听）。
+
+界面两处实测缺陷：
+- LazyColumn bottom padding 120dp 不足以让开悬浮 Tab 栏（约 130dp + 呼吸空间），
+  第 4 个持仓被压住、滚到底也看不全，改 170dp
+- 示例数据代码（900001 等）在真实接口里不存在，角标却显示"实时"，
+  等于告诉用户这是真实行情。seedSamples 显式置 DataSource.SAMPLE，
+  文案同时标注"离线样例数据，非真实行情"
+
+截图验证：浅色/深色 x 有数据/无数据 + 滚动到底，共 6 张。
+涨跌配色（红涨绿跌）、环形图占比与列表一致（51.29%）、等宽数字对齐均正确。

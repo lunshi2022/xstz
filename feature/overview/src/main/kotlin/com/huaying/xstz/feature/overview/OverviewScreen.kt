@@ -74,7 +74,14 @@ fun OverviewScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+        /*
+         * bottom 必须留够悬浮 Tab 栏的高度。
+         *
+         * 实测：120.dp 时第 4 个持仓被 Tab 栏压住，滚到底也看不全（截图为证）。
+         * Tab 栏自身约 62dp + 底部外边距 20dp + 手势导航区 ~48dp ≈ 130dp，
+         * 再留 40dp 呼吸空间 → 170dp。
+         */
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 170.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {

@@ -109,7 +109,13 @@ class OverviewViewModel @Inject constructor(
             val result = runCatching { holdingRepository.seedSampleData() }
             refreshing.value = false
             result.onSuccess { n ->
-                message.value = "已载入 $n 只示例基金"
+                /*
+                 * 必须把来源标成 SAMPLE。
+                 * 示例基金的代码（900001 等）在真实接口里不存在，
+                 * 若仍显示"实时"，等于告诉用户这是真实行情 —— 这是不能接受的误导。
+                 */
+                source.value = DataSource.SAMPLE
+                message.value = "已载入 $n 只示例基金（离线样例数据，非真实行情）"
             }.onFailure {
                 message.value = "载入失败：${it.message ?: "未知错误"}"
             }
