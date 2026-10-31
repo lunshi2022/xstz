@@ -28,8 +28,11 @@ $Root = Split-Path -Parent $PSScriptRoot
 $MinFreeMB = 3500
 
 $env:JAVA_HOME = "C:\Users\21063\toolchains\jdk17"
-$env:ANDROID_HOME = "C:\Users\21063\toolchains\android-sdk"
+$env:ANDROID_HOME = "D:\LeStoreSoftstore\Cache\WorkBuddy\android-sdk"
 $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
+# Gradle 用户目录也搬到 D 盘（7.3GB）。不设这个变量，Gradle 会回到
+# C:\Users\21063\.gradle 重新下载整套依赖——那才是真正的空间灾难。
+$env:GRADLE_USER_HOME = "D:\LeStoreSoftstore\Cache\WorkBuddy\gradle"
 
 function Get-FreeMB {
     [math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1KB)

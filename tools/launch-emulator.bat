@@ -14,10 +14,10 @@ rem
 rem  双击后本窗口立即关闭，只留模拟器窗口。
 rem ============================================================================
 
-set "SDK=C:\Users\21063\toolchains\android-sdk"
+set "SDK=D:\LeStoreSoftstore\Cache\WorkBuddy\android-sdk"
 set "ANDROID_HOME=%SDK%"
 set "ANDROID_SDK_ROOT=%SDK%"
-set "ANDROID_AVD_HOME=C:\Users\21063\toolchains\avd"
+set "ANDROID_AVD_HOME=D:\LeStoreSoftstore\Cache\WorkBuddy\avd"
 set "PATH=%SDK%\emulator;%SDK%\platform-tools;%PATH%"
 
 start "XSTZ Emulator" "%SDK%\emulator\emulator.exe" -avd xstz -memory 2048 -cores 2 -no-boot-anim -no-snapshot-save -gpu angle_indirect

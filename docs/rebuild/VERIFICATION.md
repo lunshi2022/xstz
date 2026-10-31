@@ -11,7 +11,7 @@
 | 组件 | 路径 | 版本 |
 |---|---|---|
 | JDK | `C:/Users/21063/toolchains/jdk17` | Temurin 17.0.20.1+1 |
-| Android SDK | `C:/Users/21063/toolchains/android-sdk` | platform-tools 37.0.1、platforms **android-37.0 / android-36**、build-tools 37.0.0 / 36.0.0 |
+| Android SDK | `D:/LeStoreSoftstore/Cache/WorkBuddy/android-sdk` | platform-tools 37.0.1、platforms **android-37.0 / android-36**、build-tools 37.0.0 / 36.0.0 |
 | Gradle | `~/.gradle/wrapper/dists` | 9.4.1（腾讯镜像） |
 | 验证工程 | `C:/Users/21063/toolchains/probe`（一次性，非交付物） | — |
 

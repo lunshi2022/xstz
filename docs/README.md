@@ -121,7 +121,29 @@ C:\Users\21063\toolchains\          共 1501 MB（用户级，不在仓库内，
 └── probe\              150 MB   ← 临时验证工程，可删
 ```
 
-`local.properties` 的 `sdk.dir` 指向 `C:/Users/21063/toolchains/android-sdk`。
+`local.properties` 的 `sdk.dir` 指向 `D:/LeStoreSoftstore/Cache/WorkBuddy/android-sdk`。
+
+### 目录布局（2026-11-01 迁移，C 盘瘦身）
+
+原先这些全在 C 盘，随构建与模拟器使用不断变大。现统一收到 D 盘：
+
+| 内容 | 位置 | 大小 |
+|---|---|---|
+| Android SDK | `D:\LeStoreSoftstore\Cache\WorkBuddy\android-sdk` | ~6.1 GB |
+| Gradle 用户目录（依赖缓存 + 构建缓存） | `D:\LeStoreSoftstore\Cache\WorkBuddy\gradle` | ~7.3 GB |
+| 各模块构建产物 | `D:\LeStoreSoftstore\Cache\WorkBuddy\build\<模块名>` | 按需增长 |
+| 模拟器 AVD | `D:\LeStoreSoftstore\Cache\WorkBuddy\avd` | ~4.0 GB |
+
+生效方式（缺一不可，漏掉会在 C 盘重新长一份）：
+
+- **Gradle 用户目录**：`GRADLE_USER_HOME` 环境变量（`tools/build.ps1` 已内置）；Android Studio 需在
+  Settings → Build, Execution, Deployment → Build Tools → Gradle 里把 *Gradle user home* 改成同一路径
+- **SDK**：`local.properties` 的 `sdk.dir` + `ANDROID_HOME`（脚本已内置）；IDE 侧在
+  `%APPDATA%\Google\AndroidStudio*\options\android.sdk.path.xml` 已同步
+- **构建产物**：根 `build.gradle.kts` 里 `layout.buildDirectory` 统一重定向，工程目录不再生成 `build/`
+- **AVD**：`ANDROID_AVD_HOME`（`tools/launch-emulator.bat` 已内置）
+
+排查时可对照：工程目录应始终保持约 170 MB，若发现某个模块又长出 `build/`，说明该模块没走根脚本的 subprojects 配置。
 
 ---
 

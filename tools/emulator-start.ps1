@@ -18,7 +18,7 @@ param(
 $ErrorActionPreference = "Continue"
 
 $bat = "C:\Users\21063\WorkBuddy\Worktrees\20260205124830\main-ed162e29\tools\launch-emulator.bat"
-$adb = "C:\Users\21063\toolchains\android-sdk\platform-tools\adb.exe"
+$adb = "D:\LeStoreSoftstore\Cache\WorkBuddy\android-sdk\platform-tools\adb.exe"
 $serial = "emulator-5554"
 
 function Test-Qemu {

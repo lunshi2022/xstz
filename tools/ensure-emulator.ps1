@@ -14,10 +14,10 @@ param([int]$TimeoutSec = 300)
 $ConfirmPreference = "None"
 $ErrorActionPreference = "Continue"
 
-$adb = "C:\Users\21063\toolchains\android-sdk\platform-tools\adb.exe"
+$adb = "D:\LeStoreSoftstore\Cache\WorkBuddy\android-sdk\platform-tools\adb.exe"
 $bat = "C:\Users\21063\WorkBuddy\Worktrees\20260205124830\main-ed162e29\tools\launch-emulator.bat"
 $pin = "C:\Users\21063\WorkBuddy\Worktrees\20260205124830\main-ed162e29\tools\pin-emulator-window.py"
-$avd = "C:\Users\21063\toolchains\avd\xstz.avd"
+$avd = "D:\LeStoreSoftstore\Cache\WorkBuddy\avd\xstz.avd"
 $serial = "emulator-5554"
 
 # Pin the emulator window to a fixed rect so screenshots are comparable

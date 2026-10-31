@@ -6,7 +6,8 @@ Android 14 模块化资产管理 App（A股/ETF/债券/基金），Compose + Mat
 入口 Activity：`com.huaying.xstz.MainActivity`。
 
 ## 如何打开模拟器（务必记住，可复现）
-- SDK：`C:\Users\21063\toolchains\android-sdk`；AVD：`xstz_api36`（API36 / x86_64 / google_apis）；adb 串口 `emulator-5554`。
+- SDK：`D:\LeStoreSoftstore\Cache\WorkBuddy\android-sdk`；AVD 名 `xstz`（720x1600 / API36 / x86_64 / google_apis，位于 `D:\LeStoreSoftstore\Cache\WorkBuddy\avd`）；adb 串口 `emulator-5554`。
+  **2026-11-01 起 SDK / Gradle 缓存 / AVD / 构建产物全部迁到 D 盘**（C 盘释放约 18GB），旧路径 `C:\Users\21063\toolchains\android-sdk` 与 `C:\Users\21063\.gradle` 已删除，不要再按旧路径找。
 - 沙箱禁掉所有常规启动方式（bash 后台 / `Start-Process` / `Process.Start` / `schtasks` / COM `WScript.Shell` 全被拦或报错）。
 - **唯一可行**：`explorer.exe` 打开 `tools/launch-emulator.bat`（等同双击，由 Windows shell 给 qemu 独立进程+独立控制台）。
 - 已固化 `tools/emulator-start.ps1`：explorer 拉起 → 等 qemu 进程 → 等 `adb -s emulator-5554 get-state`=device → 等 `getprop sys.boot_completed`=1。AI 自己就能跑，不必用户点鼠标。
@@ -16,7 +17,8 @@ Android 14 模块化资产管理 App（A股/ETF/债券/基金），Compose + Mat
 ## 构建安全（绝不重启机器——最高优先级）
 - 唯一构建入口 `tools/build.ps1`（ASCII-only，PowerShell 5.1 读无 BOM 文件会按 GBK 乱码，故脚本内禁中文）。
 - 强制：`--no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g -Dkotlin.daemon.jvmargs=-Xmx1280m`。
-- `JAVA_HOME=C:\Users/21063\toolchains\jdk17`；`ANDROID_HOME=C:\Users\21063\toolchains\android-sdk`。
+- `JAVA_HOME=C:\Users\21063\toolchains\jdk17`（唯一仍在 C 盘的组件，304MB）；`ANDROID_HOME=D:\LeStoreSoftstore\Cache\WorkBuddy\android-sdk`；`GRADLE_USER_HOME=D:\LeStoreSoftstore\Cache\WorkBuddy\gradle`（**不设它 Gradle 会回 C 盘重新下载整套依赖**）。
+- 构建产物已统一重定向到 `D:\LeStoreSoftstore\Cache\WorkBuddy\build\<模块名>`（根 build.gradle.kts 的 layout.buildDirectory）。工程目录应始终约 170MB；若某模块又长出 build/，说明它没走根脚本的 subprojects 配置。
 - 模拟器运行时构建需 `-Force` 覆盖"模拟器运行中拒绝"闸门；内存上限仍生效。
 - 教训：曾 `-Xmx4g + parallel + 20 worker` 压穿 15.7G 物理内存 → Kernel-Power 41 整机重启。
 

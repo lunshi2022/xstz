@@ -35,9 +35,26 @@ plugins {
 val junit4Dependency = libs.junit4
 
 // ---------------------------------------------------------------------------
+// 构建产物统一输出到 D 盘（2026-11-01）
+//
+// 动机：C 盘紧张，而 13 个模块的 build/ 加起来约 1GB，清一次马上又长回来。
+// 重定向后工程目录只留源码与配置，备份、全文搜索、看 git status 都不再被产物干扰。
+//
+// 每个模块用 project.name 作子目录名。当前 13 个模块名（common/data/database/
+// designsystem/domain/model/network/ui/charts/onboarding/overview/rebalance/
+// settings/transactions + app/benchmark）互不重复，不会互相覆盖；
+// 将来若新增同名模块，需要改成 project.path 转义。
+// ---------------------------------------------------------------------------
+val externalBuildRoot = File("D:/LeStoreSoftstore/Cache/WorkBuddy/build")
+
+layout.buildDirectory.set(File(externalBuildRoot, "root"))
+
+// ---------------------------------------------------------------------------
 // 全模块统一基线：SDK 版本、Java/Kotlin 目标、单测资源、lint 门禁
 // ---------------------------------------------------------------------------
 subprojects {
+    layout.buildDirectory.set(File(externalBuildRoot, project.name))
+
     // --- 库模块 ---
     plugins.withId("com.android.library") {
         extensions.configure<com.android.build.api.dsl.LibraryExtension> {

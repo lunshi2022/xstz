@@ -8,7 +8,7 @@ rem    every file returned "Permission denied" even outside the sandbox, with
 rem    normal ACLs, no read-only flag and no owning process. Same files that
 rem    the emulator logged as "error 13 / access denied" during boot
 rem    (modem_simulator\iccprofile_for_sim0.xml, numeric_operator.xml).
-rem    So this uses a fresh AVD at C:\Users\21063\toolchains\avd instead.
+rem    So this uses a fresh AVD at D:\LeStoreSoftstore\Cache\WorkBuddy\avd instead.
 rem
 rem  WHY IT FIXES THE BLACK SCREEN (matches a documented API-36 case):
 rem    1. fresh AVD + fresh userdata  - old userdata was a stuck 6.1MB stub
@@ -23,10 +23,10 @@ rem ============================================================================
 
 setlocal enabledelayedexpansion
 
-set "SDK=C:\Users\21063\toolchains\android-sdk"
+set "SDK=D:\LeStoreSoftstore\Cache\WorkBuddy\android-sdk"
 set "ANDROID_HOME=%SDK%"
 set "ANDROID_SDK_ROOT=%SDK%"
-set "ANDROID_AVD_HOME=C:\Users\21063\toolchains\avd"
+set "ANDROID_AVD_HOME=D:\LeStoreSoftstore\Cache\WorkBuddy\avd"
 set "PATH=%SDK%\emulator;%SDK%\platform-tools;%PATH%"
 set "ADB=%SDK%\platform-tools\adb.exe"
 set "EMU=%SDK%\emulator\emulator.exe"
