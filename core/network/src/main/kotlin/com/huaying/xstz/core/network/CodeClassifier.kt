@@ -13,8 +13,15 @@ import com.huaying.xstz.core.model.FundCode
  */
 object CodeClassifier {
 
-    /** 股票：沪主板 600/601/603/605、科创 688、沪B 900、深主板 000~004、创业板 300/301、深B 200、北交所 43/83/87/88 */
-    private val STOCK = Regex("^(60[0135]|688|900|00[0-4]|30[01]|200|43|8[378])\\d{3}$")
+    /**
+     * 股票：沪主板 600/601/603/605、科创 688、沪B 900、深主板 000~004、创业板 300/301、深B 200、北交所 43/83/87/88
+     *
+     * 注意位数：A 股代码统一 6 位，所以"2 位段 + 4 位"和"3 位段 + 3 位"必须分开写。
+     * 旧写法把北交所塞进同一组 `43|8[378]` 再跟 `\d{3}`，实际只能匹配 5 位，
+     * 结果 430047 这类北交所代码**根本不是股票**，tencentQuoteSymbol 返回 null，
+     * 行情压根不去查——界面上只表现为"暂无数据"（2026-11-01 由边界测试发现并修正）。
+     */
+    private val STOCK = Regex("^((60[0135]|688|900|00[0-4]|30[01]|200)\\d{3}|(43|8[378])\\d{4})$")
 
     /**
      * 场内基金（ETF/LOF）。
@@ -37,8 +44,15 @@ object CodeClassifier {
      */
     private val CONVERTIBLE_BOND = Regex("^(11[0138]|12[378])\\d{3}$")
 
-    /** 国债/地方债：沪 019xxx，深 10xxxx */
-    private val TREASURY_BOND = Regex("^(019|10)\\d{4}$")
+    /**
+     * 国债/地方债：沪 019xxx，深 10xxxx。
+     *
+     * 位数同样要分开写：019 是 3 位段 + 3 位，10 是 2 位段 + 4 位。
+     * 旧写法 `^(019|10)\d{4}$` 要求 019 后面跟 4 位（共 7 位），
+     * 于是 019547 这类沪市国债**一个都匹配不上**，被当成场外基金走错接口
+     * （2026-11-01 由边界测试发现并修正）。
+     */
+    private val TREASURY_BOND = Regex("^(019\\d{3}|10\\d{4})$")
 
     private val SIX_DIGITS = Regex("^\\d{6}$")
 
@@ -65,6 +79,11 @@ object CodeClassifier {
     fun stockExchange(code: String): String? = when {
         code.startsWith("6") || code.startsWith("9") -> "sh"
         code.startsWith("0") || code.startsWith("3") || code.startsWith("2") -> "sz"
+        // 北交所（43/83/87/88 段）。漏了这一档时 stockExchange 返回 null，
+        // 而 tencentQuoteSymbol 里的 `stockExchange(code)?.let{...}` 会静默给出 null，
+        // 结果是北交所股票连行情都不会去查——界面上只表现为"暂无数据"，很难归因。
+        // 腾讯行情接口对北交所使用 bj 前缀。
+        code.startsWith("4") || code.startsWith("8") -> "bj"
         else -> null
     }
 

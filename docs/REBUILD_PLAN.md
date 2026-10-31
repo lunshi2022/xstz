@@ -460,7 +460,7 @@ data class GlassTokens(
 | Segmented Control | `GlassSegmentedControl` | 滑块为实色白胶囊在玻璃槽内位移 |
 | Switch | 自绘 | iOS 尺寸 51×31dp，玻璃槽 + 白色圆钮 |
 | List Row | 实色卡片 + 细描边 | **不用玻璃**（内容层） |
-| 数字/金额 | SF Pro 风格数字等宽 | 用 `FontFeatureSetting("tnum")` 等宽数字，避免跳动 |
+| 数字/金额 | SF Pro 风格数字等宽 | 用 `FontFamily.Monospace` 等宽数字，避免跳动。**（2026-11-01 更正：原方案写 `FontFeatureSetting("tnum")`。tnum 只是开启字体自带的表格数字特性，字体不支持时完全无效；而本项目混排中英文数字，`Monospace` 能确定性保证等宽，故改用字体族实现。二者目的相同，后者更可靠。）** |
 
 ### 8.5 动效规范
 

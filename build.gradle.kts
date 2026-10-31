@@ -35,26 +35,24 @@ plugins {
 val junit4Dependency = libs.junit4
 
 // ---------------------------------------------------------------------------
-// 构建产物统一输出到 D 盘（2026-11-01）
+// 构建产物**留在工程内**，不重定向到 D 盘（2026-11-01 实测后回滚）
 //
-// 动机：C 盘紧张，而 13 个模块的 build/ 加起来约 1GB，清一次马上又长回来。
-// 重定向后工程目录只留源码与配置，备份、全文搜索、看 git status 都不再被产物干扰。
+// 试过把 layout.buildDirectory 指到 D:\...\build\<模块名>，assembleDebug 能通过，
+// 但 testDebugUnitTest 直接失败：
+//   "this and base files have different roots:
+//    D:\...\build\domain 和 C:\...\core\domain"
+// Gradle 的测试任务要按相对路径解析 source set 与资源，跨盘无法计算。
+// 而 Kover 覆盖率统计必须跑单测，所以这条重定向与"统计覆盖率"互斥。
 //
-// 每个模块用 project.name 作子目录名。当前 13 个模块名（common/data/database/
-// designsystem/domain/model/network/ui/charts/onboarding/overview/rebalance/
-// settings/transactions + app/benchmark）互不重复，不会互相覆盖；
-// 将来若新增同名模块，需要改成 project.path 转义。
+// 结论：产物留在 C 盘工程内。SDK / Gradle 缓存 / AVD 仍在 D 盘（那三项不受此限制）。
+// 若将来确实要把产物也放 D 盘，唯一可行路径是**整个工程迁到 D 盘**（同盘即可），
+// 而不是只挪 buildDirectory。
 // ---------------------------------------------------------------------------
-val externalBuildRoot = File("D:/LeStoreSoftstore/Cache/WorkBuddy/build")
-
-layout.buildDirectory.set(File(externalBuildRoot, "root"))
 
 // ---------------------------------------------------------------------------
 // 全模块统一基线：SDK 版本、Java/Kotlin 目标、单测资源、lint 门禁
 // ---------------------------------------------------------------------------
 subprojects {
-    layout.buildDirectory.set(File(externalBuildRoot, project.name))
-
     // --- 库模块 ---
     plugins.withId("com.android.library") {
         extensions.configure<com.android.build.api.dsl.LibraryExtension> {
@@ -97,6 +95,36 @@ subprojects {
         // 本项目 Money/Shares/Nav 全是 @JvmInline value class，
         // JaCoCo 会把它们算成一堆无法覆盖的合成方法，数字严重失真。
         pluginManager.apply("org.jetbrains.kotlinx.kover")
+
+        // 覆盖率过滤：排除编译期生成物。
+        //
+        // 不排除的话数字毫无参考价值——database 模块曾统计出 1.9%，因为里面
+        // 全是 Room 生成的 HoldingDao_Impl / XstzDatabase_Impl / MappersKt，
+        // 这些代码没人会手写测试，却把分母撑到 1614 行。
+        // Hilt 的 _Factory / _HiltModules 同理。
+        extensions.configure<kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension> {
+            reports {
+                filters {
+                    excludes {
+                        classes(
+                            "*_Impl",
+                            "*_Impl$*",
+                            "*_Factory",
+                            "*_HiltModules*",
+                            "*_GeneratedInjector",
+                            "*_ProvideFactory",
+                            "*.MappersKt",
+                            "*_HiltModules_BindsModule",
+                            "*Hilt_*",
+                        )
+                        packages(
+                            "dagger.hilt.internal.aggregatedroot.codegen",
+                            "hilt_aggregated_deps",
+                        )
+                    }
+                }
+            }
+        }
     }
 
     // --- Compose 开关：只对真正应用了 Compose 编译器的库模块开启 ---
