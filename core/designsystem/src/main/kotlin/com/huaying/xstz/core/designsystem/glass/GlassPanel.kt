@@ -60,6 +60,10 @@ fun GlassPanel(
     val motion = XstzTheme.motion
     val shape: Shape = remember(cornerRadius) { SquircleShape(cornerRadius = cornerRadius, smoothing = 2.8f) }
 
+    // 材质预算计数（方案阶段 2 第 4 项）：同屏玻璃 >3 层时 Debug 下告警。
+    // release 构建里 budgetEnabled 恒 false，这段是零成本。
+    TrackGlassLayer("GlassPanel(r=${cornerRadius.value})")
+
     /*
      * 只有"真机能模糊 + 用户没关透明效果 + 有采样源"三者同时成立才走 hazeBlur。
      * 否则走半透明降级：软件渲染下 hazeBlur 会输出不透明近似色，

@@ -94,11 +94,12 @@ val DarkPalette = XstzPalette(
 )
 
 /**
- * 无障碍偏好，直接对应 iOS 的两个系统开关：
+ * 无障碍偏好，对应系统级无障碍开关：
  *   * Reduce Transparency → 关掉实时模糊，改用高不透明度纯色（对比度更可控）
  *   * Reduce Motion       → 关掉位移/缩放转场，只保留淡入淡出
+ *   * High Contrast       → 把最弱一档文字（textTertiary / flat）再推一档对比度
  *
- * 这两个不是"可选优化"，是系统级无障碍能力，必须真的生效。
+ * 这些不是"可选优化"，是系统级无障碍能力，必须真的生效。
  */
 @Immutable
 data class XstzMotion(
@@ -122,14 +123,27 @@ object XstzTheme {
         @Composable @ReadOnlyComposable get() = LocalMotion.current
 }
 
+/**
+ * 高对比度变体：开启系统「高对比度文字」时，把最弱的一档文字进一步推向极值，
+ * 让原本已满足 WCAG AA 的对比度再上一个台阶。
+ *   * 浅色主题：tertiary/flat 加深到 secondary（更暗 → 浅底上对比度更高）
+ *   * 深色主题：tertiary/flat 提亮到 primary（更亮 → 深底上对比度更高）
+ */
+internal fun XstzPalette.withHighContrast(): XstzPalette {
+    val stronger = if (isDark) textPrimary else textSecondary
+    return copy(textTertiary = stronger, flat = stronger)
+}
+
 @Composable
 fun ProvideXstzTheme(
     dark: Boolean,
     reduceMotion: Boolean = false,
     reduceTransparency: Boolean = false,
+    highContrast: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val palette = if (dark) DarkPalette else LightPalette
+    val basePalette = if (dark) DarkPalette else LightPalette
+    val palette = if (highContrast) basePalette.withHighContrast() else basePalette
     val motion = XstzMotion(
         animationsEnabled = !reduceMotion,
         blurEnabled = !reduceTransparency,

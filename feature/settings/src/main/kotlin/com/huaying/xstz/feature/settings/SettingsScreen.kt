@@ -14,7 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,21 +33,18 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.huaying.xstz.core.common.Formats
 import com.huaying.xstz.core.designsystem.glass.GlassCapability
-import com.huaying.xstz.core.designsystem.glass.GlassLevel
-import com.huaying.xstz.core.designsystem.glass.GlassPanel
 import com.huaying.xstz.core.designsystem.shape.SquircleShape
 import com.huaying.xstz.core.designsystem.theme.XstzTheme
 import com.huaying.xstz.core.designsystem.theme.XstzType
 import com.huaying.xstz.core.domain.repository.SettingsRepository
+import com.huaying.xstz.core.ui.SolidCard
 import com.huaying.xstz.core.ui.HairlineDivider
 import com.huaying.xstz.core.ui.LargeTitleHeader
 import com.huaying.xstz.core.ui.SectionHeader
-import dev.chrisbanes.haze.HazeState
 
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    hazeState: HazeState?,
     onThemeChange: (Int) -> Unit,
     onPrivacyChange: (Boolean) -> Unit,
     onReduceTransparency: (Boolean) -> Unit,
@@ -52,11 +52,34 @@ fun SettingsScreen(
     onImport: (String, String) -> Unit,
     onDismissExport: () -> Unit,
     onDismissMessage: () -> Unit,
+    onOpenOperationLog: () -> Unit = {},
+    onRefreshIntervalChange: (Long) -> Unit = {},
+    onBackgroundThrottleChange: (Boolean) -> Unit = {},
+    onInitialInvestDayChange: (Long) -> Unit = {},
+    onSeedSamples: () -> Unit = {},
+    onClearOperationLog: () -> Unit = {},
+    onExportCsv: () -> Unit = {},
+    onClearAllHoldings: () -> Unit = {},
+    /**
+     * 版本展示串，由 app 模块从 BuildConfig 计算后传入。
+     *
+     * 为什么不由本模块自己拼：feature 模块拿不到 app 的 BuildConfig，
+     * 一旦在本地写死字面量，gradle 里升版本后关于页会继续显示旧号——
+     * 这类漂移没人会在发版时想起来查，所以宁可多传一个参数。
+     */
+    versionText: String,
     modifier: Modifier = Modifier,
 ) {
     val palette = XstzTheme.palette
     var showExport by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showClearConfirm by remember { mutableStateOf(false) }
+    var showChangelog by remember { mutableStateOf(false) }
+    val investedDays =
+        if (state.initialInvestDay > 0)
+            (java.time.LocalDate.now().toEpochDay() - state.initialInvestDay).coerceAtLeast(0)
+        else 0L
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -68,11 +91,9 @@ fun SettingsScreen(
         // ---------- 外观 ----------
         item { SectionHeader(title = "外观") }
         item {
-            GlassPanel(
+            SolidCard(
                 modifier = Modifier.fillMaxWidth(),
-                state = hazeState,
                 cornerRadius = 20.dp,
-                level = GlassLevel.Regular,
                 contentPadding = 14.dp,
             ) {
                 Column {
@@ -129,11 +150,9 @@ fun SettingsScreen(
         // ---------- 数据 ----------
         item { SectionHeader(title = "数据备份", subtitle = "口令派生密钥，换机也能恢复") }
         item {
-            GlassPanel(
+            SolidCard(
                 modifier = Modifier.fillMaxWidth(),
-                state = hazeState,
                 cornerRadius = 20.dp,
-                level = GlassLevel.Regular,
                 contentPadding = 14.dp,
             ) {
                 Column {
@@ -160,21 +179,193 @@ fun SettingsScreen(
             }
         }
 
+        // ---------- 行情刷新 ----------
+        item { SectionHeader(title = "行情刷新", subtitle = "仅交易时段、应用前台时自动刷新") }
+        item {
+            SolidCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 20.dp,
+                contentPadding = 14.dp,
+            ) {
+                Column {
+                    Text("刷新频率", style = XstzType.caption, color = palette.textTertiary)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            SettingsRepository.REFRESH_INTERVAL_FAST to "流畅（3 秒）",
+                            SettingsRepository.REFRESH_INTERVAL_NORMAL to "省电（5 秒）",
+                        ).forEach { (ms, label) ->
+                            val selected = state.refreshIntervalMs == ms
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .background(
+                                        if (selected) palette.accent.copy(alpha = 0.18f) else palette.divider,
+                                        SquircleShape(10.dp, 2.5f),
+                                    )
+                                    .clickable { onRefreshIntervalChange(ms) }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    label,
+                                    style = XstzType.caption,
+                                    color = if (selected) palette.accent else palette.textSecondary,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    ToggleRow(
+                        title = "后台降频",
+                        subtitle = "应用退到后台后放慢刷新以省电；关闭则用前台频率，更实时但更耗电",
+                        checked = state.backgroundThrottle,
+                        onCheckedChange = onBackgroundThrottleChange,
+                    )
+                }
+            }
+        }
+
+        // ---------- 投资基准 ----------
+        // 初始投资日期是年化收益的分母。没有它，界面只能给绝对收益，
+        // 用户无法判断"赚 6 千"到底是三个月还是三年赚的。
+        item { SectionHeader(title = "投资基准", subtitle = "用于计算年化收益与投资时长") }
+        item {
+            SolidCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDatePicker = true },
+                cornerRadius = 20.dp,
+                contentPadding = 14.dp,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("初始投资日期", style = XstzType.body, color = palette.textPrimary)
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = if (state.initialInvestDay > 0)
+                            "${Formats.date(state.initialInvestDay)} · 已投资 $investedDays 天"
+                        else "未设置",
+                        style = XstzType.caption,
+                        color = palette.textTertiary,
+                    )
+                }
+            }
+        }
+
+        // ---------- 数据管理 ----------
+        item { SectionHeader(title = "数据管理", subtitle = "示例数据与本机诊断记录") }
+        item {
+            SolidCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 20.dp,
+                contentPadding = 14.dp,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onSeedSamples),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("重建示例数据", style = XstzType.body, color = palette.accent)
+                        Spacer(Modifier.weight(1f))
+                        Text("重新灌入示例持仓", style = XstzType.caption, color = palette.textTertiary)
+                    }
+                    HairlineDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onClearOperationLog),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("清空操作日志", style = XstzType.body, color = palette.accent)
+                        Spacer(Modifier.weight(1f))
+                        Text("不影响任何资产数据", style = XstzType.caption, color = palette.textTertiary)
+                    }
+                    HairlineDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onExportCsv),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("导出 CSV", style = XstzType.body, color = palette.accent)
+                        Spacer(Modifier.weight(1f))
+                        Text("明文，可直接用表格打开", style = XstzType.caption, color = palette.textTertiary)
+                    }
+                    HairlineDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showClearConfirm = true },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // 用涨色（红）而非 accent：这是不可撤销的破坏性操作，
+                        // 配色上必须和普通操作区分开，避免误当成"又一个导出按钮"
+                        Text("清空全部持仓", style = XstzType.body, color = palette.up)
+                        Spacer(Modifier.weight(1f))
+                        Text("不可撤销，需二次确认", style = XstzType.caption, color = palette.textTertiary)
+                    }
+                }
+            }
+        }
+
+        // ---------- 数据 ----------
+        item { SectionHeader(title = "操作记录") }
+        item {
+            SolidCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenOperationLog() },
+                cornerRadius = 20.dp,
+                contentPadding = 14.dp,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "操作日志",
+                        style = XstzType.body,
+                        color = palette.textPrimary,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = "查看本机数据变更",
+                        style = XstzType.caption,
+                        color = palette.textTertiary,
+                    )
+                }
+            }
+        }
+
         // ---------- 关于 ----------
         item { SectionHeader(title = "关于") }
         item {
-            GlassPanel(
+            SolidCard(
                 modifier = Modifier.fillMaxWidth(),
-                state = hazeState,
                 cornerRadius = 20.dp,
-                level = GlassLevel.Thin,
                 contentPadding = 14.dp,
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    InfoRow("版本", "2.0.0 (200)")
+                    /*
+                     * Alpha 标注由调用方（app 模块）拼进 versionText：
+                     * 当前是重构后的首个公开形态，功能面完整但仍在真机打磨，
+                     * 必须让用户在关于页直接看到，而不是等他遇到问题才发现。
+                     */
+                    InfoRow("版本", versionText)
                     InfoRow("包名", "com.huaying.xstz")
+                    InfoRow("开发者", "lunshi2022")
                     InfoRow("渲染", GlassCapability.describe())
                     InfoRow("崩溃诊断", "零第三方 SDK · 本地日志 · 可导出")
+                    HairlineDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showChangelog = true },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("更新说明", style = XstzType.body, color = palette.accent)
+                        Spacer(Modifier.weight(1f))
+                        Text("查看版本变更", style = XstzType.caption, color = palette.textTertiary)
+                    }
                 }
             }
         }
@@ -216,11 +407,20 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = onDismissExport,
             containerColor = XstzTheme.palette.backgroundElevated,
-            title = { Text("备份已生成", style = XstzType.title3, color = XstzTheme.palette.textPrimary) },
+            title = {
+                Text(
+                    if (state.exportedIsCsv) "CSV 已生成" else "备份已生成",
+                    style = XstzType.title3,
+                    color = XstzTheme.palette.textPrimary,
+                )
+            },
             text = {
                 Column {
                     Text(
-                        "共 ${payload.length} 字符。请复制后保存到安全的地方，不要把口令与备份放在一起。",
+                        if (state.exportedIsCsv)
+                            "共 ${payload.length} 字符，UTF-8 带 BOM，Excel 可直接打开。这是明文文件，请注意存放位置。"
+                        else
+                            "共 ${payload.length} 字符。请复制后保存到安全的地方，不要把口令与备份放在一起。",
                         style = XstzType.caption,
                         color = XstzTheme.palette.textSecondary,
                     )
@@ -244,6 +444,93 @@ fun SettingsScreen(
                 }
             },
         )
+    }
+
+    if (showChangelog) {
+        AlertDialog(
+            onDismissRequest = { showChangelog = false },
+            containerColor = XstzTheme.palette.backgroundElevated,
+            title = { Text("更新说明", style = XstzType.title3, color = XstzTheme.palette.textPrimary) },
+            text = {
+                Text(
+                    "当前为 2.0.0 重构版（Alpha）。\n\n" +
+                        "旧版 v1.6.5 已停止维护，数据不直接沿用；" +
+                        "历史记录请在新版中通过此前导出的备份恢复。\n\n" +
+                        "本次重构：模块化架构、资产配置与再平衡、" +
+                        "本地加密存储、离线样例显式标注。",
+                    style = XstzType.caption,
+                    color = XstzTheme.palette.textSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showChangelog = false }) {
+                    Text("知道了", color = XstzTheme.palette.accent)
+                }
+            },
+        )
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            containerColor = XstzTheme.palette.backgroundElevated,
+            title = {
+                Text("清空全部持仓？", style = XstzType.title3, color = XstzTheme.palette.textPrimary)
+            },
+            text = {
+                Text(
+                    "将删除所有持仓及其交易流水，此操作不可撤销。\n若没有可用备份，数据无法找回。",
+                    style = XstzType.caption,
+                    color = XstzTheme.palette.textSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onClearAllHoldings()
+                    showClearConfirm = false
+                }) { Text("确认清空", color = XstzTheme.palette.up) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) {
+                    Text("取消", color = XstzTheme.palette.textTertiary)
+                }
+            },
+        )
+    }
+
+    if (showDatePicker) {
+        val dateState = rememberDatePickerState(
+            initialSelectedDateMillis = if (state.initialInvestDay > 0) {
+                java.time.LocalDate.ofEpochDay(state.initialInvestDay)
+                    .atStartOfDay(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+            } else null,
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    // DatePicker 给的是 UTC 毫秒；转回本地日期的 epochDay 再存，
+                    // 与仓储层"存 epochDay 而非时间戳"的约定保持一致
+                    dateState.selectedDateMillis?.let { millis ->
+                        val day = java.time.Instant.ofEpochMilli(millis)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalDate()
+                            .toEpochDay()
+                        onInitialInvestDayChange(day)
+                    }
+                    showDatePicker = false
+                }) { Text("确定", color = XstzTheme.palette.accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("取消", color = XstzTheme.palette.textTertiary)
+                }
+            },
+        ) {
+            DatePicker(state = dateState)
+        }
     }
 }
 

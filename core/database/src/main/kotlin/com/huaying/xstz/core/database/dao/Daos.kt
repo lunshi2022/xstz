@@ -8,6 +8,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.huaying.xstz.core.database.entity.HoldingEntity
 import com.huaying.xstz.core.database.entity.NavPointEntity
+import com.huaying.xstz.core.database.entity.NetValueSnapshotEntity
 import com.huaying.xstz.core.database.entity.OperationLogEntity
 import com.huaying.xstz.core.database.entity.TradeEntity
 import kotlinx.coroutines.flow.Flow
@@ -61,6 +62,29 @@ interface HoldingDao {
 
     @Query("SELECT COALESCE(SUM(target_ratio), 0.0) FROM holdings")
     suspend fun sumTargetRatio(): Double
+
+    /**
+     * 三个聚合查询。
+     *
+     * 它们存在的意义是**证明 SQLCipher 下 SQL 聚合正确**——旧版 P0-2 的返修点。
+     * 旧实现把金额做列级加密存成 TEXT，`SUM(holdingQuantity * currentPrice)`
+     * 变成对密文字符串做算术，SQLite 静默返回错误值而不报错。
+     *
+     * 注意全部用 COALESCE 包住：`SUM` 在空集合上返回 NULL，
+     * Room 映射到非空 Long 会直接崩，包了才安全。
+     *
+     * `SUM(shares_micros * nav_micros)` 用 INTEGER 运算：
+     * 两者都是 ×1e4 定点，乘积是 ×1e8，所以下面再 `/ 10000` 回到 ×1e4。
+     * 必须显式写乘法顺序（先乘后除），先除会丢精度。
+     */
+    @Query("SELECT COALESCE(SUM(shares_micros), 0) FROM holdings")
+    suspend fun sumSharesMicros(): Long
+
+    @Query("SELECT COALESCE(SUM(cost_micros), 0) FROM holdings")
+    suspend fun sumCostMicros(): Long
+
+    @Query("SELECT COALESCE(SUM(shares_micros * nav_micros / 10000), 0) FROM holdings")
+    suspend fun sumMarketValueMicros(): Long
 
     @Query("SELECT COUNT(*) FROM holdings")
     suspend fun count(): Int
@@ -163,6 +187,50 @@ interface OperationLogDao {
 
     @Query("DELETE FROM operation_logs")
     suspend fun clear()
+}
+
+@Dao
+interface NetValueSnapshotDao {
+
+    /**
+     * 写入/覆盖某一天的组合快照。
+     *
+     * 用 REPLACE 而不是 ABORT：同一天可能重算多次（刷新行情、重新计算），
+     * 快照是**派生数据**，覆盖是正确的，冲突报错才是错的。
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(snapshot: NetValueSnapshotEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(snapshots: List<NetValueSnapshotEntity>)
+
+    /** 区间读取，图表与日历都按这个查 */
+    @Query(
+        """
+        SELECT * FROM net_value_snapshot
+        WHERE epoch_day BETWEEN :fromDay AND :toDay
+        ORDER BY epoch_day ASC
+        """
+    )
+    suspend fun range(fromDay: Long, toDay: Long): List<NetValueSnapshotEntity>
+
+    @Query("SELECT * FROM net_value_snapshot ORDER BY epoch_day ASC")
+    fun observeAll(): Flow<List<NetValueSnapshotEntity>>
+
+    @Query("SELECT * FROM net_value_snapshot ORDER BY epoch_day DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<NetValueSnapshotEntity>
+
+    @Query("SELECT MAX(epoch_day) FROM net_value_snapshot")
+    suspend fun latestDay(): Long?
+
+    @Query("SELECT MIN(epoch_day) FROM net_value_snapshot")
+    suspend fun earliestDay(): Long?
+
+    @Query("SELECT COUNT(*) FROM net_value_snapshot")
+    suspend fun count(): Int
+
+    @Query("DELETE FROM net_value_snapshot")
+    suspend fun deleteAll()
 }
 
 /**

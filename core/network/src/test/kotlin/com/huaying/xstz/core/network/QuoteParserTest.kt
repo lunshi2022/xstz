@@ -135,11 +135,23 @@ class CodeClassifierTest {
     @Test
     fun `场外基金是六位数字且非股票非场内`() {
         assertFalse(CodeClassifier.isOpenEndFund("000001")) // 深市股票
-        assertTrue(CodeClassifier.isOpenEndFund("110022"))
         assertTrue(CodeClassifier.isOpenEndFund("519674"))
         assertTrue(CodeClassifier.isOpenEndFund("008888"))
         // 001186 属于深市主板 001xxx 股票段，不应判为场外基金
         assertFalse(CodeClassifier.isOpenEndFund("001186"))
+    }
+
+    @Test
+    fun `代码段重叠的标的不由静态规则断言归属`() {
+        // 110022 是"同业转债"(sh110022) 与"易方达消费行业"(jj110022) 共用的代码。
+        // 静态规则只能给出"它落在可转债段内"，无法断言它就是债券；
+        // 真实归属必须靠 QuoteSource.candidates 同时查两边后的候选列表让用户选。
+        assertTrue(CodeClassifier.isConvertibleBond("110022"))
+        assertTrue(CodeClassifier.isBond("110022"))
+        // 因此它既不该被当作纯场外基金，也不该被当作纯债券
+        assertFalse(CodeClassifier.isOpenEndFund("110022"))
+        // 但场内符号要能生成，否则转债那条路就断了
+        assertEquals("sh110022", CodeClassifier.tencentQuoteSymbol("110022"))
     }
 
     @Test
@@ -155,7 +167,10 @@ class CodeClassifierTest {
 
     @Test
     fun `场外基金不给行情符号`() {
-        assertNull(CodeClassifier.tencentQuoteSymbol("110022"))
+        // 用 519674 / 008888 这类"只在场外存在"的代码做断言。
+        // 不能用 110022：它同时是沪市可转债，行情符号必须是 sh110022。
+        assertNull(CodeClassifier.tencentQuoteSymbol("519674"))
+        assertNull(CodeClassifier.tencentQuoteSymbol("008888"))
     }
 
     @Test

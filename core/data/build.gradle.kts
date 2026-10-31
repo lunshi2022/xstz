@@ -18,6 +18,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.lifecycle.process)
 
     // 备份口令派生：纯 JVM 实现，不含 native 库，规避 16KB 页对齐问题
     implementation(libs.password4j)

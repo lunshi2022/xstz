@@ -1,6 +1,7 @@
 package com.huaying.xstz.feature.overview
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -22,8 +23,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,14 +39,14 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.huaying.xstz.core.common.Formats
-import com.huaying.xstz.core.designsystem.glass.GlassLevel
-import com.huaying.xstz.core.designsystem.glass.GlassPanel
 import com.huaying.xstz.core.designsystem.shape.SquircleShape
 import com.huaying.xstz.core.designsystem.theme.XstzTheme
 import com.huaying.xstz.core.designsystem.theme.XstzType
+import com.huaying.xstz.core.designsystem.tokens.Motion
 import com.huaying.xstz.core.model.AssetType
 import com.huaying.xstz.core.model.Holding
 import com.huaying.xstz.core.model.Money
+import com.huaying.xstz.core.ui.SolidCard
 import com.huaying.xstz.core.ui.ChangeText
 import com.huaying.xstz.core.ui.EmptyState
 import com.huaying.xstz.core.ui.GlassPrimaryButton
@@ -48,7 +54,9 @@ import com.huaying.xstz.core.ui.HairlineDivider
 import com.huaying.xstz.core.ui.LargeTitleHeader
 import com.huaying.xstz.core.ui.SectionHeader
 import com.huaying.xstz.core.ui.SourceBadge
-import dev.chrisbanes.haze.HazeState
+
+/** 相对时间文案的重算节拍。freshness 最小粒度为分钟，15 秒足够把误差压在半分钟内 */
+private const val TICK_MS = 15_000L
 
 /**
  * 资产概览。
@@ -60,10 +68,10 @@ import dev.chrisbanes.haze.HazeState
  *
  * 隐私模式只遮挡数字不遮挡结构，这样截图分享时既能给别人看配置、又不泄露金额。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(
     state: OverviewUiState,
-    hazeState: HazeState?,
     onRefresh: () -> Unit,
     onTogglePrivacy: () -> Unit,
     onOpenHolding: (Long) -> Unit,
@@ -72,22 +80,65 @@ fun OverviewScreen(
 ) {
     val palette = XstzTheme.palette
 
-    LazyColumn(
+    /*
+     * 相对时间必须自己走。
+     *
+     * Compose 只在状态变化时重组，而 lastSync 在刷新之外不会变——于是
+     * "更新于 X"会被冻结在首次求值那一刻。实测：静置 132 秒文案纹丝不动，
+     * 强制重组后立刻变成"1 分钟前"，证明数据其实很旧，只是文案没老化。
+     *
+     * 对用户而言这等同虚报新鲜度：盯着看十分钟，界面仍宣称行情是"刚刚"拉的。
+     *
+     * 两个踩过的坑都写在这里，别再踩：
+     * 1. 不能用 Stateless +「等别的 state 变了顺带更新」——必须主动打拍。
+     * 2. nowMs 必须在**屏级 scope** 读取并就地算出字符串，再传给 LazyColumn
+     *    的 item。若把 nowMs 直接读进 item lambda，更新只 invalidate 那个
+     *    item 的局部 scope，LazyColumn 不会重新组合它，实测照样冻结在旧值。
+     * produceState 随 composable 离开自动取消，页面不可见时不空转。
+     */
+    val nowMs by produceState(initialValue = System.currentTimeMillis()) {
+        while (true) {
+            delay(TICK_MS)
+            value = System.currentTimeMillis()
+        }
+    }
+    val freshnessText = remember(state.lastSync, nowMs) { Formats.freshness(state.lastSync, nowMs) }
+
+    /*
+     * 下拉刷新：方案 §5.1 P0 第 2 项把「手动下拉刷新」与自动刷新并列要求，
+     * 此前整仓没有任何 pullRefresh 实现——自动刷新再好，用户想"现在立刻拉一次"
+     * 时没有手势入口，这是功能缺失而不只是没测。
+     *
+     * isRefreshing 直接接 ViewModel 的 refreshing 锁：下拉触发的 onRefresh
+     * 与自动刷新共用同一把互斥锁，不会叠加打接口。
+     */
+    PullToRefreshBox(
+        isRefreshing = state.refreshing,
+        onRefresh = onRefresh,
         modifier = modifier.fillMaxSize(),
-        /*
-         * bottom 必须留够悬浮 Tab 栏的高度。
-         *
-         * 实测：120.dp 时第 4 个持仓被 Tab 栏压住，滚到底也看不全（截图为证）。
-         * Tab 栏自身约 62dp + 底部外边距 20dp + 手势导航区 ~48dp ≈ 130dp，
-         * 再留 40dp 呼吸空间 → 170dp。
-         */
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 170.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            /*
+             * bottom 必须留够悬浮 Tab 栏的高度。
+             *
+             * 实测：120.dp 时第 4 个持仓被 Tab 栏压住，滚到底也看不全（截图为证）。
+             * Tab 栏自身约 62dp + 底部外边距 20dp + 手势导航区 ~48dp ≈ 130dp，
+             * 再留 40dp 呼吸空间 → 170dp。
+             */
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 170.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
         item {
             LargeTitleHeader(
                 title = "概览",
-                subtitle = if (state.lastSync > 0) "更新于 ${Formats.freshness(state.lastSync)}" else "尚未同步",
+                // 三态而非两态：无持仓时说"暂无持仓"，
+                // 否则会显示"更新于 刚刚"，暗示刚刚刷新到了（并不存在的）数据
+                subtitle = when {
+                    state.holdings.isEmpty() -> "暂无持仓"
+                    state.lastSync > 0 -> "更新于 $freshnessText"
+                    else -> "尚未同步"
+                },
                 trailing = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -109,11 +160,9 @@ fun OverviewScreen(
 
         // ---------- 总资产 ----------
         item {
-            GlassPanel(
+            SolidCard(
                 modifier = Modifier.fillMaxWidth(),
-                state = hazeState,
                 cornerRadius = 28.dp,
-                level = GlassLevel.Thick,
                 contentPadding = 20.dp,
             ) {
                 Column {
@@ -137,7 +186,17 @@ fun OverviewScreen(
                         color = palette.textPrimary,
                     )
                     Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                    // 本金必须与盈亏并列：只有市值与收益时，用户无法回答"我到底投了多少"，
+                    // 也容易把累计收益误读成本金（方案 §5.1 P0 第 1 项明确列举"本金"）。
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        MetricColumn(
+                            label = "本金",
+                            value = if (state.privacy) Formats.PRIVACY_MASK
+                            else Formats.currency(state.summary.totalCost.toYuan()),
+                            valueColor = palette.textPrimary,
+                            sub = "",
+                            subColor = palette.textTertiary,
+                        )
                         MetricColumn(
                             label = "当日盈亏",
                             value = if (state.privacy) "****"
@@ -161,17 +220,18 @@ fun OverviewScreen(
 
         // ---------- 配置结构 ----------
         item {
-            GlassPanel(
+            SolidCard(
                 modifier = Modifier.fillMaxWidth(),
-                state = hazeState,
                 cornerRadius = 24.dp,
-                level = GlassLevel.Regular,
                 contentPadding = 16.dp,
             ) {
                 Column {
                     SectionHeader(
                         title = "资产配置",
-                        subtitle = if (state.needsRebalance) "有持仓偏离目标，建议再平衡" else "结构与目标一致",
+                        // 用"可查看差额"而非"建议再平衡"：验收清单 §11 合规项要求
+                        // 文案不得出现投资建议类表述。这里只提示存在偏离，
+                        // 不替用户做任何买卖决定。
+                        subtitle = if (state.needsRebalance) "有持仓偏离目标，可查看再平衡差额" else "结构与目标一致",
                     )
                     Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -227,7 +287,6 @@ fun OverviewScreen(
                     holding = holding,
                     ratio = state.ratios[holding.fundId] ?: 0.0,
                     privacy = state.privacy,
-                    hazeState = hazeState,
                     onClick = { onOpenHolding(holding.fundId) },
                 )
             }
@@ -244,6 +303,7 @@ fun OverviewScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 )
             }
+        }
         }
     }
 }
@@ -285,8 +345,14 @@ fun AllocationRing(
     val total = ratios.values.sum().coerceAtLeast(0.0001)
 
     val progress by animateFloatAsState(
-        targetValue = if (motion.animationsEnabled) 1f else 1f,
-        animationSpec = tween(900),
+        // 入环动画从 0 扫到 1；关闭动效时跳过动画直接到终值。
+        // （旧写法 1f else 1f 是空操作，animationsEnabled 实际没起作用）
+        targetValue = 1f,
+        animationSpec = if (motion.animationsEnabled) {
+            tween(Motion.TAB_MS, easing = Motion.iosEaseOut)
+        } else {
+            snap()
+        },
         label = "ring",
     )
 
@@ -364,15 +430,12 @@ private fun HoldingRow(
     holding: Holding,
     ratio: Double,
     privacy: Boolean,
-    hazeState: HazeState?,
     onClick: () -> Unit,
 ) {
     val palette = XstzTheme.palette
-    GlassPanel(
+    SolidCard(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        state = hazeState,
         cornerRadius = 20.dp,
-        level = GlassLevel.Thin,
         contentPadding = 14.dp,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -396,6 +459,25 @@ private fun HoldingRow(
                     style = XstzType.caption,
                     color = palette.textTertiary,
                 )
+                // 偏离度与状态：方案 §5.1 要求持仓列表给出「市值·占比·偏离度·状态」。
+                // 之前只有一句汇总式提示"有持仓偏离目标"，用户看不出是**哪一只**偏了。
+                // 偏离用百分点（pp）而非百分比：占比之差是两个百分数相减，写成 % 会差一个数量级。
+                val target = holding.targetRatio
+                val devPp = (ratio - target) * 100.0
+                if (target > 0.0001) {
+                    val status = when {
+                        devPp >= 1.0 -> "超配"
+                        devPp <= -1.0 -> "低配"
+                        else -> "正常"
+                    }
+                    Text(
+                        "目标 ${Formats.ratio(target)} · 偏离 ${Formats.percentagePoints(devPp)} · $status",
+                        style = XstzType.caption2,
+                        color = if (status == "正常") palette.textTertiary else palette.accent,
+                    )
+                } else {
+                    Text("未设目标", style = XstzType.caption2, color = palette.textTertiary)
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(

@@ -29,15 +29,38 @@ object CodeClassifier {
      */
     private val EXCHANGE_FUND = Regex("^(50[0-6]\\d{3}|51[0-8]\\d{3}|56[0-3]\\d{3}|58[89]\\d{3}|1[568]\\d{4})$")
 
+    /**
+     * 可转债：沪 110/111/113/118，深 123/127/128。
+     *
+     * 注意与场外基金重叠：110022 既在可转债段内，又是"易方达消费行业"的基金代码。
+     * 所以这个判定只用于"要不要去场内接口试一下"，不能用来断言"它是债券"。
+     */
+    private val CONVERTIBLE_BOND = Regex("^(11[0138]|12[378])\\d{3}$")
+
+    /** 国债/地方债：沪 019xxx，深 10xxxx */
+    private val TREASURY_BOND = Regex("^(019|10)\\d{4}$")
+
     private val SIX_DIGITS = Regex("^\\d{6}$")
 
     fun isStock(code: String): Boolean = STOCK.matches(code)
 
     fun isExchangeTradedFund(code: String): Boolean = EXCHANGE_FUND.matches(code)
 
-    /** 场外基金 = 六位数字，且不是股票、不是场内基金 */
+    fun isConvertibleBond(code: String): Boolean = CONVERTIBLE_BOND.matches(code)
+
+    fun isTreasuryBond(code: String): Boolean = TREASURY_BOND.matches(code)
+
+    fun isBond(code: String): Boolean = isConvertibleBond(code) || isTreasuryBond(code)
+
+    /**
+     * 场外基金 = 六位数字，且不是股票、不是场内基金、不是债券。
+     *
+     * 这个判定只用于"要不要查场外接口"。真正判断一个代码到底是什么，
+     * 靠的是 [QuoteSource.candidates] 同时查两个接口后返回的候选列表——
+     * 代码段重叠决定了任何静态规则都会在某个代码上猜错。
+     */
     fun isOpenEndFund(code: String): Boolean =
-        SIX_DIGITS.matches(code) && !isStock(code) && !isExchangeTradedFund(code)
+        SIX_DIGITS.matches(code) && !isStock(code) && !isExchangeTradedFund(code) && !isBond(code)
 
     fun stockExchange(code: String): String? = when {
         code.startsWith("6") || code.startsWith("9") -> "sh"
@@ -51,6 +74,15 @@ object CodeClassifier {
         else -> null
     }
 
+    /** 债券的交易所：沪市 019/110/111/113/118，深市 10/123/127/128 */
+    fun bondExchange(code: String): String? = when {
+        code.startsWith("019") -> "sh"
+        code.startsWith("11") -> "sh"
+        code.startsWith("12") -> "sz"
+        code.startsWith("10") -> "sz"
+        else -> null
+    }
+
     /**
      * 给出腾讯行情接口需要的带前缀代码。
      * 场外基金走另一套接口（fundgz），这里返回 null 表示"不该用行情接口"。
@@ -59,6 +91,7 @@ object CodeClassifier {
         isOpenEndFund(code) -> null
         isStock(code) -> stockExchange(code)?.let { "$it$code" }
         isExchangeTradedFund(code) -> fundExchange(code)?.let { "$it$code" }
+        isBond(code) -> bondExchange(code)?.let { "$it$code" }
         FundCode.isExchangePrefixed(code) -> code.lowercase()
         else -> null
     }

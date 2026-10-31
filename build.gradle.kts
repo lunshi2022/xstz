@@ -20,11 +20,15 @@ buildscript {
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.test) apply false
     // Kotlin 2.0+ 起 Compose 编译器由独立插件提供，不再用 composeOptions.kotlinCompilerExtensionVersion
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
+    // 覆盖率统计。不 apply 到具体模块，由下面的 subprojects 统一挂载——
+    // 13 个模块逐个写一遍既啰嗦又容易漏。
+    alias(libs.plugins.kover) apply false
 }
 
 // 在 subprojects 之外取一次，避免在子项目上下文里重复解析版本目录
@@ -55,11 +59,27 @@ subprojects {
                 warningsAsErrors = false
                 disable += setOf("GradleDependency", "AndroidGradlePluginVersion", "NewerVersionAvailable")
             }
+            // 基准生成器（benchmark 模块）需要 :app:benchmark 变体，而 :app:benchmark 又要求
+            // 所有库依赖也暴露 benchmark 变体。给每个库模块补同名 buildType，使变体精确对齐，
+            // 比依赖 matchingFallbacks 跨模块级联更稳（级联在实测中未生效）。
+            buildTypes {
+                create("benchmark") {
+                    isMinifyEnabled = false
+                    matchingFallbacks += listOf("release")
+                }
+            }
         }
         extensions.configure<KotlinAndroidProjectExtension> {
             compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
         }
         dependencies.add("testImplementation", junit4Dependency)
+
+        // --- 覆盖率统计（方案阶段 1 验收：补覆盖率）---
+        // 只对库模块挂载：:app 本身几乎无业务代码，统计它只会稀释数字。
+        // 用 Kover 而非 JaCoCo：Kover 原生理解 Kotlin inline/value class，
+        // 本项目 Money/Shares/Nav 全是 @JvmInline value class，
+        // JaCoCo 会把它们算成一堆无法覆盖的合成方法，数字严重失真。
+        pluginManager.apply("org.jetbrains.kotlinx.kover")
     }
 
     // --- Compose 开关：只对真正应用了 Compose 编译器的库模块开启 ---

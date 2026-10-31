@@ -29,13 +29,23 @@ object FundCode {
 enum class DataSource {
     LIVE,
     CACHE,
-    SAMPLE;
+    SAMPLE,
+
+    /**
+     * 没有任何行情数据（全新安装 / 从未刷新成功 / 持仓为空）。
+     *
+     * 这一档存在的理由：默认值曾是 LIVE，于是空界面上赫然写着"实时"——
+     * 一条行情都没有却宣称实时，与"样例数据必须标离线样例"是同一类误导。
+     * 没有数据就该如实说没有，不能靠默认值蒙过去。
+     */
+    NONE;
 
     val displayName: String
         get() = when (this) {
             LIVE -> "实时"
             CACHE -> "缓存"
             SAMPLE -> "离线样例"
+            NONE -> "暂无数据"
         }
 }
 

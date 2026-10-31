@@ -55,7 +55,9 @@ object XstzType {
     )
 
     val displayLarge = style(40, FontWeight.Bold, 46, -0.5, tabular = true)
-    val largeTitle = style(34, FontWeight.Bold, 40, -0.4)
+    // 字距 -0.5：VISUAL_ACCEPTANCE §2-F 要求大标题字距 -0.5~-0.8sp，
+    // 原来的 -0.4 落在区间外，大字号下会显得"松垮"（正值更明显，安卓默认常为正）
+    val largeTitle = style(34, FontWeight.Bold, 40, -0.5)
     val title1 = style(28, FontWeight.SemiBold, 34, -0.3)
     val title2 = style(22, FontWeight.SemiBold, 28, -0.2)
     val title3 = style(20, FontWeight.Medium, 26)

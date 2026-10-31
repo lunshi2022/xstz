@@ -72,11 +72,50 @@ android {
                 "proguard-rules.pro",
             )
         }
+        // 基准生成器（benchmark 模块）按同名 buildType 对齐变体：
+        // 与生产 release 同源（同样开启 R8），便于在真机上产出与生产一致的基线 profile。
+        // matchingFallbacks 让库依赖（core:*）无需各自声明 benchmark 变体，回落到 release 即可。
+        create("benchmark") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            matchingFallbacks += listOf("release")
+            signingConfig =
+                if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    /*
+     * ABI 拆分：只留 arm64-v8a。
+     *
+     * SQLCipher 的 libsqlcipher.so 四个架构合计 18.5MB，全打进一个包会让
+     * release APK 从 2.97MB 涨到 21.54MB，超出方案第 389 行的 <12MB 目标。
+     *
+     * 为什么只留 arm64：
+     *   * Play 自 2019 年起要求 64 位支持，2020 年后上市的设备几乎全为 arm64
+     *   * 32 位 arm 设备已不在 Android 14（本项目 minSdk 34）的支持范围内
+     *   * x86/x86_64 只用于模拟器——它们由 universalApk 覆盖，见下
+     *
+     * universalApk = true 保留一个包含全部架构的包：
+     *   模拟器是 x86_64，装不了 arm64-only 包。没有这个 fallback，
+     *   本地跑 connectedAndroidTest 会直接失败。
+     */
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = true
+        }
     }
 
     buildFeatures {
@@ -131,6 +170,7 @@ dependencies {
     implementation(projects.feature.charts)
     implementation(projects.feature.rebalance)
     implementation(projects.feature.settings)
+    implementation(projects.feature.onboarding)
 
     implementation(libs.core.ktx)
     implementation(libs.activity.compose)

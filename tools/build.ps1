@@ -47,7 +47,13 @@ function Stop-BuildDaemons {
 }
 
 function Test-EmulatorRunning {
-    $emu = Get-Process qemu-system-x86_64, emulator -ErrorAction SilentlyContinue
+    # Judge by resident memory, not by "process exists".
+    # A crashed qemu leaves a zombie with a 0-50 MB working set that can never
+    # boot again -- and on this host it cannot even be killed ("access denied"),
+    # so it lingers forever. Counting that zombie as "emulator running" would
+    # block every build with a message that is plainly wrong.
+    $emu = Get-Process qemu-system-x86_64, emulator -ErrorAction SilentlyContinue |
+        Where-Object { $_.WorkingSet64 -gt 300MB }
     return ($null -ne $emu)
 }
 

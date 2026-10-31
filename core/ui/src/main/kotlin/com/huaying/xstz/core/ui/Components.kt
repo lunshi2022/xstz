@@ -134,6 +134,8 @@ fun SourceBadge(source: com.huaying.xstz.core.model.DataSource, modifier: Modifi
         com.huaying.xstz.core.model.DataSource.LIVE -> palette.down
         com.huaying.xstz.core.model.DataSource.CACHE -> palette.textTertiary
         com.huaying.xstz.core.model.DataSource.SAMPLE -> XstzColorsWarning
+        // 无数据用中性色：既不是"实时"的绿，也不是警示的橙，不暗示任何新鲜度
+        com.huaying.xstz.core.model.DataSource.NONE -> palette.textTertiary
     }
     Row(
         modifier = modifier

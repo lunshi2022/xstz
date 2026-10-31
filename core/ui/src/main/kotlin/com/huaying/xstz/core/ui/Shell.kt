@@ -111,30 +111,62 @@ private fun TabItem(
         label = "tabAlpha",
     )
 
+    // 方案 §8.3 第 456 行：选中项背景为一个小胶囊。
+    // 用**淡入淡出**而不是位移滑块：五个 Tab 等宽，位移滑块在跨两个以上
+    // 位置时会快速划过中间的图标，观感上是"闪一下"。淡入更安静，也更省一次
+    // 布局测量（不需要知道每个 item 的 x 坐标）。
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "tabPill",
+    )
+
     val interaction = remember { MutableInteractionSource() }
-    Column(
+    // 外层吃掉 weight(1f) 的等分宽度并承接点击——这样五项的点击热区是均分的，
+    // 不会出现"点图标之间的空白没反应"。
+    Box(
         modifier = modifier
             .scale(if (motion.animationsEnabled) scale else 1f)
-            .alpha(alpha)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick,
-            )
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = tab.icon,
-            contentDescription = tab.label,
-            tint = if (selected) palette.accent else palette.textSecondary,
-            modifier = Modifier.size(22.dp),
-        )
-        Text(
-            text = tab.label,
-            style = XstzType.caption2,
-            color = if (selected) palette.accent else palette.textSecondary,
-        )
+        // 内层收缩包裹，胶囊宽度由图标/文字决定，而不是撑满 1/5 屏宽。
+        // 撑满会让选中项看起来像一条横杠，不是方案要的"小胶囊"。
+        Box(
+            modifier = Modifier
+                .then(
+                    if (pillAlpha > 0.01f) {
+                        Modifier.background(
+                            palette.accent.copy(alpha = 0.14f * pillAlpha),
+                            squircleCapsule(),
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier.alpha(alpha).padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = tab.icon,
+                    contentDescription = tab.label,
+                    tint = if (selected) palette.accent else palette.textSecondary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Text(
+                    text = tab.label,
+                    style = XstzType.caption2,
+                    color = if (selected) palette.accent else palette.textSecondary,
+                )
+            }
+        }
     }
 }
 

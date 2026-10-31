@@ -6,6 +6,7 @@ plugins {
 dependencies {
     api(projects.core.model)
     api(projects.core.common)
+    api(projects.core.domain)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)

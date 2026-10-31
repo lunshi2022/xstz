@@ -63,6 +63,20 @@ object Formats {
     fun ratio(value: Double, privacy: Boolean = false): String =
         if (privacy) "**%" else "${PERCENT_2F.format(value * 100.0)}%"
 
+    /**
+     * 百分点（percentage points），带符号。入参是**百分点数值**，不是比例
+     * （2.73 输出 "+2.73pp"，表示目标 40% 而当前 42.73%）。
+     *
+     * 为什么单独做而不是复用 [percent]：占比之差是"两个百分比相减"，单位上
+     * 是百分点而非百分比。写成 "%" 会让"当前 42.73% 比目标 40% 高 2.73%"被
+     * 误读成"高了 2.73% 的相对幅度"，两者数值可以差一个数量级。
+     */
+    fun percentagePoints(value: Double, privacy: Boolean = false): String {
+        if (privacy) return "**pp"
+        val safe = if (abs(value) < 0.005) 0.0 else value
+        return if (safe >= 0) "+${PERCENT_2F.format(safe)}pp" else "${PERCENT_2F.format(safe)}pp"
+    }
+
     fun ratio1f(value: Double): String = "${PERCENT_1F.format(value * 100.0)}%"
 
     // ---------------- 价格 / 份额 ----------------

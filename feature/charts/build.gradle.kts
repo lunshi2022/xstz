@@ -25,6 +25,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
 
     debugImplementation(libs.compose.ui.tooling)
+    testImplementation(libs.junit4)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.turbine)
 }

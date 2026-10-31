@@ -76,6 +76,10 @@ fun interface TradingCalendar {
 
 /**
  * 组合时钟。注入 now() 与 calendar，让"当前是几点"和"今天休不休市"都可控。
+ *
+ * 不在此处加 `@Inject constructor`：本模块（core:common）未启用 Hilt 插件，
+ * 字段注入无法被处理。`MarketClock` 通过 [com.huaying.xstz.core.data.di.DataModule]
+ * 的 `@Provides` 提供给依赖图，避免把 Hilt 引入这个轻量基础模块。
  */
 class MarketClock(
     private val calendar: TradingCalendar = TradingCalendar.WEEKEND_ONLY,

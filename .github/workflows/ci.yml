@@ -1,0 +1,137 @@
+# 构建与质量门禁
+#
+# ⚠️ 本文件已写好但**未启用**（仓库远程暂不动，见 ADR-014）。
+#    推送到 GitHub 后 GitHub Actions 会自动识别并开始运行。
+#    若要暂不运行，可在仓库 Settings → Actions 里 disable，
+#    或把本文件改为 .yml.disabled。
+#
+# 三道门禁（对应方案阶段 5 的验收要求）：
+#   1. build    —— debug/release 都能编出来，且单测全绿
+#   2. align    —— APK 内 64 位 native 库满足 16KB 页对齐（Play 2027 硬要求）
+#   3. size     —— release APK 体积不超过预算
+#
+# 刻意不做的：connectedAndroidTest（需要模拟器，GitHub 免费 runner 上
+# 硬件加速不稳定，跑起来动辄 20 分钟且经常超时）。
+# 设备侧测试（SQLCipher 加密、迁移）在本地跑，见 README 的验证清单。
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: # 允许手动触发，便于验证配置本身
+
+# 同一分支的新提交取消上一次未完成的运行，省 runner 额度
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 与 tools/build.ps1 保持一致的 JDK；AGP 9 要求 17+
+  JAVA_VERSION: '17'
+
+jobs:
+  build:
+    name: 编译与单元测试
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      # Gradle 9 的配置缓存对依赖顺序敏感，缓存这两层能显著缩短冷启动
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 单元测试（全部模块）
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: 构建 release
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: 上传测试报告（失败时用于定位）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: '**/build/reports/tests/**'
+          retention-days: 7
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 7
+
+  alignment:
+    name: 16KB 页对齐校验
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # 只需要 arm64 包：它才是真正分发给用户的产物
+      - name: 构建 arm64 release 包
+        run: ./gradlew assembleRelease --stacktrace
+
+      # 这是本轮实际踩到的坑：旧坐标 android-database-sqlcipher 的 so
+      # 是 0x1000 对齐，不合规；换成 sqlcipher-android 才是 0x4000。
+      # 编译期完全无感，只有这个脚本能拦住。
+      - name: 校验 ELF 对齐
+        run: |
+          chmod +x tools/check-elf-alignment.sh
+          bash tools/check-elf-alignment.sh app/build/outputs/apk/release/app-arm64-v8a-release.apk
+
+  size:
+    name: APK 体积预算
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 构建并检查体积
+        run: |
+          ./gradlew assembleRelease --stacktrace
+          APK=app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          if [ ! -f "$APK" ]; then
+            echo "错误：找不到 $APK，ABI 拆分配置可能被改动" >&2
+            exit 1
+          fi
+          BYTES=$(stat -c%s "$APK")
+          MB=$(awk "BEGIN{printf \"%.2f\", $BYTES/1048576}")
+          echo "arm64 release APK: ${MB} MB"
+
+          # 预算 12MB（方案第 389 行）。
+          # 当前实测 7.87MB，留约 50% 余量给后续功能。
+          # 超过就失败，避免体积无声膨胀——SQLCipher 的 native 库
+          # 已经吃掉 5MB，再加依赖很容易越线。
+          LIMIT_MB=12
+          if awk "BEGIN{exit !($MB > $LIMIT_MB)}"; then
+            echo "错误：APK ${MB}MB 超出预算 ${LIMIT_MB}MB" >&2
+            exit 1
+          fi
+          echo "体积在预算内"

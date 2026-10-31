@@ -1,0 +1,25 @@
+# 基准配置文件（Baseline Profile）种子。
+#
+# 完整、最优的 profile 必须在真机/模拟器上运行 `:benchmark` 模块的
+# BaselineProfileGenerator 产出（见
+# benchmark/src/main/kotlin/.../BaselineProfileGenerator.kt），再把生成的
+# `baseline-prof.txt` 覆盖本文件。本种子只保证无设备时 AGP 也能把 profile
+# 编进 release APK，由 ProfileInstaller 在首次启动时安装以获得 AOT 收益。
+#
+# 格式规则（2026-10-31 实测，两次踩坑后确认）：
+#   类规则     Lcom/example/Foo;                                  ← **不能带 flags**
+#   方法规则   HSPLcom/example/Foo;->onCreate(Landroid/os/Bundle;)V ← flags + 完整签名
+#
+# 踩坑 1：写 `HSPLcom/.../MainActivity;->*`（通配方法）会让 AGP 的
+#         expandReleaseArtProfileWildcards 抛 `String index out of range`。
+# 踩坑 2：给类规则加 flags 会报
+#         "Class rules don't support flags, but 'HSP' were specified"。
+# 无设备时无法枚举真实方法签名，所以这里一律用**不带 flags 的纯类规则**。
+
+# 冷启动入口：Application / Activity 的创建与首屏合成
+Lcom/huaying/xstz/MainActivity;
+
+# 主题与排版对象在首屏即被读取，预热其初始化
+Lcom/huaying/xstz/core/designsystem/theme/XstzTheme;
+Lcom/huaying/xstz/core/designsystem/theme/XstzType;
+Lcom/huaying/xstz/core/designsystem/theme/XstzColors;

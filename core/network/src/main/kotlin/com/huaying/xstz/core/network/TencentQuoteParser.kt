@@ -80,6 +80,47 @@ object TencentQuoteParser {
      * 不引入 JSON 解析库，用正则取键值——这个接口十年没变过格式，
      * 为它拉一个 parser 不值得，且正则版更容易在字段缺失时降级。
      */
+    /**
+     * 解析腾讯的**场外基金**行情（jj 前缀）。
+     *
+     * 为什么不再用天天基金的 fundgz 接口：2026-10 实测它已返回东方财富的 404 页面
+     * （带 `?rt=` 缓存参数也一样），基金类标的全部查不到。腾讯的 `jj` 前缀可直连：
+     *
+     *   v_jj000001="000001~华夏成长混合~0.0000~0.0000~~0.9190~3.4920~-5.0620~2026-10-30~";
+     *
+     * 字段（~ 分隔）：0 代码 / 1 名称 / 5 单位净值 / 6 累计净值 / 7 日涨跌% / 8 净值日期。
+     * 与东财 `f10/lsjz` 的 DWJZ=0.9190、JZZZL=-5.06 完全一致，可交叉验证。
+     *
+     * 注意与 [parseQuote] 的差异：场外基金**没有昨收价**，只有净值与涨跌幅，
+     * 所以昨日净值要由 nav / (1 + 涨跌幅) 反推，否则当日盈亏会算成 0。
+     */
+    fun parseFundQuote(expectedCode: String, raw: String): Estimate? {
+        val inner = raw.substringAfter('"', "").substringBefore('"')
+        if (inner.isBlank()) return null
+        val f = inner.split("~")
+        if (f.size < 9) return null
+
+        val name = f[1].trim()
+        val navValue = f[5].toDoubleOrNull() ?: return null
+        // 净值 <= 0 视为无效：新发基金在募集期就是这个值，没有净值可展示
+        if (navValue <= 0.0) return null
+
+        val changePercent = f[7].toDoubleOrNull() ?: 0.0
+        val navDate = f[8].trim()
+        val factor = 1.0 + changePercent / 100.0
+        val prevNav = if (factor > 0.01) navValue / factor else navValue
+
+        return Estimate(
+            code = expectedCode,
+            name = name,
+            nav = Nav.fromDouble(prevNav),
+            estimatedNav = Nav.fromDouble(navValue),
+            estimatedChangePercent = changePercent,
+            navDate = navDate,
+            estimateTime = navDate,
+        )
+    }
+
     fun parseEstimate(expectedCode: String, raw: String): Estimate? {
         val body = extractJsonpPayload(raw) ?: return null
 

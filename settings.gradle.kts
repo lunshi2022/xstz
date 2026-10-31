@@ -49,6 +49,8 @@ include(":feature:transactions")
 include(":feature:charts")
 include(":feature:rebalance")
 include(":feature:settings")
+include(":feature:onboarding")
+include(":benchmark")
 
 // 类型安全项目访问器：让 projects.core.model 在编译期就能发现模块名写错，
 // 而不是等到运行时才抛 "Project with path ':core:modle' could not be found"。

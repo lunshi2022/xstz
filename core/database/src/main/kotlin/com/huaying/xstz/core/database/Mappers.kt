@@ -2,13 +2,16 @@ package com.huaying.xstz.core.database
 
 import com.huaying.xstz.core.database.entity.HoldingEntity
 import com.huaying.xstz.core.database.entity.NavPointEntity
+import com.huaying.xstz.core.database.entity.NetValueSnapshotEntity
 import com.huaying.xstz.core.database.entity.OperationLogEntity
 import com.huaying.xstz.core.database.entity.TradeEntity
 import com.huaying.xstz.core.model.AssetType
 import com.huaying.xstz.core.model.Holding
+import com.huaying.xstz.core.model.InstrumentKind
 import com.huaying.xstz.core.model.Money
 import com.huaying.xstz.core.model.Nav
 import com.huaying.xstz.core.model.NavPoint
+import com.huaying.xstz.core.model.NetValueSnapshot
 import com.huaying.xstz.core.model.Shares
 import com.huaying.xstz.core.model.Trade
 import com.huaying.xstz.core.model.TradeType
@@ -29,6 +32,9 @@ fun HoldingEntity.toModel(): Holding = Holding(
     code = code,
     name = name,
     type = runCatching { AssetType.valueOf(type) }.getOrDefault(AssetType.STOCK),
+    // 用 this.kind 而不是 kind：后者在 lambda 里会解析成「参数名」，
+    // data class 的默认值表达式里容易写成自引用
+    kind = runCatching { InstrumentKind.valueOf(this.kind) }.getOrDefault(InstrumentKind.FUND),
     shares = Shares(sharesMicros),
     cost = Money(costMicros),
     nav = Nav(navMicros),
@@ -82,6 +88,30 @@ fun OperationLogEntity.toDomain(): OperationRecord = OperationRecord(
     payload = payload,
     createdAt = createdAt,
 )
+
+fun NetValueSnapshotEntity.toModel(): NetValueSnapshot = NetValueSnapshot(
+    epochDay = epochDay,
+    totalValue = Money(totalValueMicros),
+    principal = Money(principalMicros),
+    dayProfit = Money(dayProfitMicros),
+    stockValue = Money(stockValueMicros),
+    bondValue = Money(bondValueMicros),
+    commodityValue = Money(commodityValueMicros),
+    cashValue = Money(cashValueMicros),
+)
+
+fun NetValueSnapshot.toEntity(now: Long = System.currentTimeMillis()): NetValueSnapshotEntity =
+    NetValueSnapshotEntity(
+        epochDay = epochDay,
+        totalValueMicros = totalValue.micros,
+        principalMicros = principal.micros,
+        dayProfitMicros = dayProfit.micros,
+        stockValueMicros = stockValue.micros,
+        bondValueMicros = bondValue.micros,
+        commodityValueMicros = commodityValue.micros,
+        cashValueMicros = cashValue.micros,
+        createdAt = now,
+    )
 
 /** 操作日志的领域视图（不进 core:model，避免模型层被日志概念污染） */
 data class OperationRecord(

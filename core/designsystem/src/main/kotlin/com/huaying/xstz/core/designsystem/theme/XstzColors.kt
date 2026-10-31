@@ -16,15 +16,18 @@ import androidx.compose.ui.graphics.Color
 object XstzColors {
 
     // ---------------- 品牌 ----------------
-    val Accent = Color(0xFF3A6FF7)
+    // 3568EA：原 3A6FF7 与白字对比 4.38 < WCAG AA 4.5。加深此档后 4.86，
+    // 是"肉眼几乎无差"的最小加深量（AccentSoft 仍留给深色主题的强调）。
+    val Accent = Color(0xFF3568EA)
     val AccentSoft = Color(0xFF6C93FF)
     val AccentDeep = Color(0xFF2450C8)
 
     // ---------------- 涨跌（A 股习惯：红涨绿跌）----------------
+    // Down 加深：原 12A67B 在浅色实卡上 2.94 < 大字号 3.0 下限；0F9E73 为 3.23。
     val Up = Color(0xFFE5484D)
     val UpSoft = Color(0x33E5484D)
-    val Down = Color(0xFF12A67B)
-    val DownSoft = Color(0x3312A67B)
+    val Down = Color(0xFF0F9E73)
+    val DownSoft = Color(0x330F9E73)
     val Flat = Color(0xFF8A93A6)
 
     // ---------------- 资产类别 ----------------
@@ -46,8 +49,9 @@ object XstzColors {
 
         val textPrimary = Color(0xFF11151C)
         val textSecondary = Color(0xFF4A5468)
-        // 浅色下原 #8E98AB 在灰玻璃上对比度不足（截图中"当日盈亏"几乎看不见）
-        val textTertiary = Color(0xFF6B7688)
+        // 65707F：原 #8E98AB→#6B7688 在玻璃/实卡上仍不足 4.5:1（实测 4.27~4.35），
+        // 再加深一档到 4.77。footnote/caption 都靠它，不能只卡及格线。
+        val textTertiary = Color(0xFF65707F)
         val divider = Color(0x1A000000)
     }
 

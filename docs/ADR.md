@@ -24,10 +24,11 @@
 | ADR-011 | 语言 | 仅简体中文，资源结构按可国际化设计 | ✅ | 文案工作量 |
 | ADR-012 | 行情数据源 | 保留接口抽象，腾讯为默认实现 | ✅ | `core:network` |
 | ADR-013 | 动态取色 | 移除 Material You | ✅ | 主题系统 |
-| ADR-014 | **仓库处置** | **沿用现有仓库、先本地重建、远程暂不动、旧代码打 tag 保留** | ✅ | CI、历史记录 |
+| ADR-014 | **仓库处置** | ~~沿用现有仓库、远程暂不动~~ → **本地已转独立仓库，重建成果需推送远端** | 🔄 **已变更** | CI、分发、历史保留 |
 | ADR-015 | **开发方式** | **由 AI 全程开发**，分批交付 | ✅ | 排期口径 |
 | ADR-016 | 开工时机 | **⬜ 待你点头**：阶段 0 骨架尚未创建，等你确认后开始 | ⬜ **待确认** | 下一动作 |
 | **ADR-017** | **compileSdk** | **必须 37**（由 Haze 传递依赖决定，非可选） | ✅ **实测结论** | 所有构建脚本 |
+| **ADR-018** | **数据库加密** | **SQLCipher 整库加密**（`net.zetetic:sqlcipher-android` 4.7.2）+ Keystore 包裹随机 DEK | ✅ **已实现** | `core:database`、密码学 |
 
 ---
 
@@ -64,6 +65,67 @@ Haze 是 **Kotlin Multiplatform** 库，其 android 变体依赖 **JetBrains Com
 **维护含义（重要）**：
 
 > **Haze 版本与 Compose 版本是耦合的。** 升级 Haze 会拉动 Compose 版本，进而可能再次抬高 compileSdk 下限。每次动 `haze` 版本号后，必须重新确认 `composeBom` 解析结果与 compileSdk 下限，不能只看 BOM 声明值。
+
+---
+
+## ADR-018 · 数据库加密：SQLCipher 整库 + Keystore 包裹随机 DEK
+
+**背景**：方案 P0-2 记录旧版最严重的架构缺陷——用 `EncryptedDoubleConverter`
+把金额做列级加密存成 TEXT，导致 `SUM(holdingQuantity * currentPrice)` 在
+SQLite 侧对密文字符串做算术，静默返回错误值。REBUILD_PLAN 第 226 行确定
+「数据库加密 = SQLCipher for Android，整库加密，保留 SQL 聚合/索引能力」。
+
+**决策 1：加密形态 —— 整库加密，不做列级**
+
+库文件整体由 SQLCipher 加密。列在 SQLite 眼里仍是普通 INTEGER/REAL，
+`SUM` / `ORDER BY` / 索引 / `GROUP BY` 全部照常工作，DAO 层无需为加密做任何让步。
+这是对 P0-2 的直接返修：问题根源不是"加密不够"，而是"加密的粒度错了"。
+
+**决策 2：动的是哪个 artifact —— `sqlcipher-android`，不是 `android-database-sqlcipher`**
+
+方案原文写的是 `net.zetetic:android-database-sqlcipher:4.7.2`，这个坐标+
+版本组合**在 Maven Central 上不存在**（实测已确认）：
+
+| artifactId | 最高版本 | arm64 `LOAD p_align` | 16KB 页合规 |
+|---|---|---|---|
+| `android-database-sqlcipher` | **4.5.4** | `0x1000` | ❌ |
+| `sqlcipher-android` | 4.20.0 | `0x4000` | ✅ |
+
+即：4.7.2 这个版本号是对的，但属于新 artifactId。选新库的决定性理由是
+**16KB 页对齐**——方案风险表 T3 已预判「选 4.7+ 版本并核对其 16KB 支持」，
+本次实测正是执行这一核对，结论与新库一致。旧库若被采用会直接违反
+Play 2027-02 起对 64 位 native 库的要求。
+
+**负面后果**：arm64 so 从 3.6MB 增至 5.2MB，release APK 体积上升（实测见状态文档）。
+这是换取加密能力与上架合规的必然代价，无替代方案。
+
+**决策 3：口令来源 —— Keystore 包裹的随机 DEK**
+
+方案第 306 行给了两个选项「Keystore 包裹的随机 DEK，或用户口令派生」。
+选前者：
+
+1. 本地库每次启动要求输入口令，是把备份场景的交互成本错误搬到主流程——
+   用户打开 App 就得输密码，是产品事故。
+2. 随机 256 位 DEK 熵高于任何可记忆口令，不需要 KDF 拉伸，启动更快。
+3. **与 ADR-008 不矛盾**：ADR-008 要求的是**导出文件**必须口令派生，
+   因为文件要跨设备而 Keystore 密钥出不了设备。库文件不跨设备，
+   两者场景不同，选型不同是正确的。
+
+**负面后果（诚实记录）**：用户在系统设置里「清除凭据」或恢复出厂后，
+Keystore 重建导致包裹密钥变更，DEK 再也解不出，库文件虽在但打不开。
+此时**不能静默重建库**——那等于无声丢失用户资产数据，与拒绝
+`fallbackToDestructiveMigration` 是同一条原则。实现上抛异常并提示从备份恢复，
+且明确告知"不要卸载重装"（卸载会一并删库）。
+
+**测试策略（受环境限制）**：SQLCipher 的核心是 native 库，Robolectric
+无法加载（实测抛 `UnsatisfiedLinkError: nativeOpen`）。因此测试分两层：
+
+- **JVM 层**（`KeyEnvelopeTest`，7 个用例）：封包格式、边界校验、AES-GCM 往返
+- **设备层**（`SqlCipherAggregationTest`，4 个用例）：真实加密落盘、
+  文件头非明文 SQLite、`SUM()` 聚合精确、错误口令打不开
+
+第二条的「文件头非明文」断言是最后防线：若有人删掉 `openHelperFactory`，
+所有功能测试仍会全绿（Room 用框架 SQLite 也能跑），只有这条会红。
 
 ---
 
@@ -272,7 +334,19 @@ Haze 是 **Kotlin Multiplatform** 库，其 android 变体依赖 **JetBrains Com
 
 ## ADR-014 · 仓库处置（零风险方案）
 
-**决策**：沿用现有仓库，**先本地重建，远程暂不动，旧代码打 tag 保留**。
+**决策（2026-10-31 变更）**：~~沿用现有仓库、先本地重建、远程暂不动~~
+→ **本地工作区转为自包含独立仓库，重建成果需推送到远端**；旧代码仍以 tag 保留。
+
+**为什么变更**：原方案把"远程暂不动"当作零风险，但实践后果是远程长期落后本地
+21 个提交，本地一旦受损就只剩单点。2026-10-31 真实发生过一次：
+清理目录时误删了 worktree 所指向的主仓库，导致 git 全部失效，靠回收站才救回。
+
+**已完成**：本地由 git worktree（`.git` 是指向 `E:/AI/Project/20260205124830/.git` 的文件）
+转为**独立仓库**（`.git` 为真实目录），21 个提交与 `legacy/pre-rebuild` tag 均完整保留，
+不再依赖 E 盘那个目录。
+
+**当前阻塞**：构建环境到 GitHub 的网络不通（`CONNECT tunnel failed, 502`），
+推送需由本人执行，或先修好代理。详见 `TEST_PLAN.md`。
 
 **已执行**：`git tag legacy/pre-rebuild`（指向 `de5591c`，含 v1.6.5-Beta 的 3 个未推送重构提交）。
 

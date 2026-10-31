@@ -22,18 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.huaying.xstz.core.common.Formats
-import com.huaying.xstz.core.designsystem.glass.GlassLevel
-import com.huaying.xstz.core.designsystem.glass.GlassPanel
 import com.huaying.xstz.core.designsystem.shape.SquircleShape
 import com.huaying.xstz.core.designsystem.theme.XstzTheme
 import com.huaying.xstz.core.designsystem.theme.XstzType
 import com.huaying.xstz.core.model.ActionType
 import com.huaying.xstz.core.model.AdjustmentItem
 import com.huaying.xstz.core.model.RebalanceStrategy
+import com.huaying.xstz.core.ui.SolidCard
 import com.huaying.xstz.core.ui.EmptyState
 import com.huaying.xstz.core.ui.LargeTitleHeader
 import com.huaying.xstz.core.ui.SectionHeader
-import dev.chrisbanes.haze.HazeState
 import kotlin.math.roundToInt
 
 /**
@@ -46,9 +44,10 @@ import kotlin.math.roundToInt
 @Composable
 fun RebalanceScreen(
     state: RebalanceUiState,
-    hazeState: HazeState?,
     onStrategyChange: (RebalanceStrategy) -> Unit,
     onThresholdChange: (Double) -> Unit,
+    onOpenTargetAllocation: () -> Unit,
+    onOpenTradeHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = XstzTheme.palette
@@ -63,6 +62,25 @@ fun RebalanceScreen(
                 title = "再平衡",
                 subtitle = if (state.hasAction) "有偏离需要处理" else "当前结构与目标一致",
             )
+        }
+
+        // ---------- 入口 ----------
+        // 两个二级页的入口放在标题下第一屏可见处：
+        // 「目标仓位」是再平衡的输入，「交易历史」是它的执行结果，
+        // 二者与再平衡是同一件事的三个环节，不该藏进设置
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                EntryButton(
+                    label = "设置目标仓位",
+                    onClick = onOpenTargetAllocation,
+                    modifier = Modifier.weight(1f),
+                )
+                EntryButton(
+                    label = "交易历史",
+                    onClick = onOpenTradeHistory,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
 
         if (state.isEmpty) {
@@ -106,11 +124,9 @@ fun RebalanceScreen(
 
         // ---------- 阈值 ----------
         item {
-            GlassPanel(
+            SolidCard(
                 modifier = Modifier.fillMaxWidth(),
-                state = hazeState,
                 cornerRadius = 20.dp,
-                level = GlassLevel.Thin,
                 contentPadding = 14.dp,
             ) {
                 Column {
@@ -154,11 +170,9 @@ fun RebalanceScreen(
 
         // ---------- 汇总 ----------
         item {
-            GlassPanel(
+            SolidCard(
                 modifier = Modifier.fillMaxWidth(),
-                state = hazeState,
                 cornerRadius = 22.dp,
-                level = GlassLevel.Thick,
                 contentPadding = 16.dp,
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -193,15 +207,32 @@ fun RebalanceScreen(
             }
         } else {
             items(items, key = { it.fundId }) { item ->
-                AdjustmentCard(item, hazeState)
+                AdjustmentCard(item)
             }
         }
     }
 }
 
 @Composable
-private fun SummaryCell(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+private fun EntryButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val palette = XstzTheme.palette
+    Box(
+        modifier
+            .background(palette.backgroundElevated, SquircleShape(12.dp, 2.6f))
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = XstzType.caption, color = palette.accent)
+    }
+}
+
+@Composable
+private fun SummaryCell(label: String, value: String, color: Color, modifier: Modifier = Modifier) {    val palette = XstzTheme.palette
     Column(modifier) {
         Text(label, style = XstzType.caption2, color = palette.textTertiary)
         Spacer(Modifier.height(2.dp))
@@ -210,16 +241,14 @@ private fun SummaryCell(label: String, value: String, color: Color, modifier: Mo
 }
 
 @Composable
-private fun AdjustmentCard(item: AdjustmentItem, hazeState: HazeState?) {
+private fun AdjustmentCard(item: AdjustmentItem) {
     val palette = XstzTheme.palette
     val isBuy = item.action == ActionType.BUY
     val accent = if (isBuy) palette.up else palette.down
 
-    GlassPanel(
+    SolidCard(
         modifier = Modifier.fillMaxWidth(),
-        state = hazeState,
         cornerRadius = 18.dp,
-        level = GlassLevel.Regular,
         contentPadding = 13.dp,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -3,6 +3,8 @@ package com.huaying.xstz.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.huaying.xstz.core.domain.repository.BackupRepository
+import com.huaying.xstz.core.domain.repository.HoldingRepository
+import com.huaying.xstz.core.domain.repository.OperationLogRepository
 import com.huaying.xstz.core.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,22 +20,32 @@ data class SettingsUiState(
     val privacyMode: Boolean = false,
     val reduceTransparency: Boolean = false,
     val thresholdPct: Double = SettingsRepository.DEFAULT_THRESHOLD,
+    val refreshIntervalMs: Long = SettingsRepository.DEFAULT_REFRESH_INTERVAL,
+    /** 后台降频开关。true = 后台按较慢频率刷新（默认，省电） */
+    val backgroundThrottle: Boolean = true,
     val lastBackup: Long = 0L,
+    /** 初始投资日期（epochDay），0 = 未设置。年化收益与投资时长的基准 */
+    val initialInvestDay: Long = 0L,
     val busy: Boolean = false,
     val message: String? = null,
     /** 导出结果，非空时弹出可复制的对话框 */
     val exportedPayload: String? = null,
+    /** true = 上面那份 payload 是 CSV（不是加密备份），决定对话框文案 */
+    val exportedIsCsv: Boolean = false,
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val backup: BackupRepository,
+    private val holdings: HoldingRepository,
+    private val operationLog: OperationLogRepository,
 ) : ViewModel() {
 
     private val busy = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
     private val exported = MutableStateFlow<String?>(null)
+    private val exportIsCsv = MutableStateFlow(false)
     private val lastBackup = MutableStateFlow(0L)
 
     init {
@@ -45,21 +57,36 @@ class SettingsViewModel @Inject constructor(
         settings.observePrivacyMode(),
         settings.observeReducedTransparency(),
         settings.observeThreshold(),
-    ) { theme, privacy, transparency, threshold ->
+        settings.observeRefreshIntervalMs(),
+    ) { theme, privacy, transparency, threshold, interval ->
         SettingsUiState(
             themeMode = theme,
             privacyMode = privacy,
             reduceTransparency = transparency,
             thresholdPct = threshold,
+            refreshIntervalMs = interval,
         )
-    }.combine(busy) { s, b -> s.copy(busy = b) }
+        // 第 6 个流必须链式 combine：类型化的 combine 重载最多只到 5 个，
+        // 硬塞进同一个 combine 会退化成 Array<*> 版本，类型推断全部崩掉。
+    }.combine(settings.observeInitialInvestDay()) { s, day -> s.copy(initialInvestDay = day) }
+        .combine(settings.observeBackgroundThrottle()) { s, t -> s.copy(backgroundThrottle = t) }
+        .combine(busy) { s, b -> s.copy(busy = b) }
         .combine(message) { s, m -> s.copy(message = m) }
         .combine(exported) { s, e -> s.copy(exportedPayload = e) }
+        .combine(exportIsCsv) { s, csv -> s.copy(exportedIsCsv = csv) }
         .combine(lastBackup) { s, t -> s.copy(lastBackup = t) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun setThemeMode(mode: Int) {
         viewModelScope.launch { settings.setThemeMode(mode) }
+    }
+
+    fun setRefreshInterval(ms: Long) {
+        viewModelScope.launch { settings.setRefreshIntervalMs(ms) }
+    }
+
+    fun setBackgroundThrottle(enabled: Boolean) {
+        viewModelScope.launch { settings.setBackgroundThrottle(enabled) }
     }
 
     fun setPrivacy(enabled: Boolean) {
@@ -68,6 +95,67 @@ class SettingsViewModel @Inject constructor(
 
     fun setReduceTransparency(enabled: Boolean) {
         viewModelScope.launch { settings.setReducedTransparency(enabled) }
+    }
+
+    fun setInitialInvestDay(epochDay: Long) {
+        viewModelScope.launch { settings.setInitialInvestDay(epochDay) }
+    }
+
+    /**
+     * 重建示例数据。
+     *
+     * 存在的理由：清空或首次使用后界面全空，无法验证列表行高、占比环形图、
+     * 涨跌配色是否还对。这是给"验收"用的入口，不是给用户日常用的。
+     */
+    fun seedSamples() {
+        viewModelScope.launch {
+            busy.value = true
+            runCatching { holdings.seedSampleData() }
+                .onSuccess { n -> message.value = "已重建 $n 只示例持仓（离线样例，非真实行情）" }
+                .onFailure { message.value = "重建失败：${it.message}" }
+            busy.value = false
+        }
+    }
+
+    /** 清空操作日志。日志是本机诊断记录，清掉不影响任何资产数据 */
+    fun clearOperationLog() {
+        viewModelScope.launch {
+            runCatching { operationLog.clear() }
+                .onSuccess { message.value = "操作日志已清空" }
+                .onFailure { message.value = "清空失败：${it.message}" }
+        }
+    }
+
+    /**
+     * 清空全部持仓。**不可撤销**，调用前 UI 必须走二次确认对话框。
+     *
+     * 之所以放在设置页而不是长按列表：这是"把整个账本抹掉"的操作，
+     * 一旦误触就找不回来（除非有备份），必须让用户明确走一遍确认。
+     */
+    fun clearAllHoldings() {
+        viewModelScope.launch {
+            busy.value = true
+            runCatching { holdings.clearAllHoldings() }
+                .onSuccess { n ->
+                    message.value = if (n == 0) "当前没有持仓可清空" else "已清空 $n 只持仓及其流水"
+                }
+                .onFailure { message.value = "清空失败：${it.message}" }
+            busy.value = false
+        }
+    }
+
+    /** 导出持仓 CSV（明文，非加密备份）。用于用户自己拿去表格里分析 */
+    fun exportCsv() {
+        viewModelScope.launch {
+            busy.value = true
+            runCatching { holdings.exportHoldingsCsv() }
+                .onSuccess { csv ->
+                    exportIsCsv.value = true
+                    exported.value = csv
+                }
+                .onFailure { message.value = "导出失败：${it.message}" }
+            busy.value = false
+        }
     }
 
     /**
@@ -116,6 +204,7 @@ class SettingsViewModel @Inject constructor(
 
     fun dismissExport() {
         exported.value = null
+        exportIsCsv.value = false
     }
 
     fun dismissMessage() {
