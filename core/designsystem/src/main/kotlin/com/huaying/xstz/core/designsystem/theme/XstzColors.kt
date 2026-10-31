@@ -48,10 +48,21 @@ object XstzColors {
         val glassShadow = Color(0x14000000)
 
         val textPrimary = Color(0xFF11151C)
-        val textSecondary = Color(0xFF4A5468)
-        // 65707F：原 #8E98AB→#6B7688 在玻璃/实卡上仍不足 4.5:1（实测 4.27~4.35），
-        // 再加深一档到 4.77。footnote/caption 都靠它，不能只卡及格线。
-        val textTertiary = Color(0xFF65707F)
+        val textSecondary = Color(0xFF343E52)
+        /**
+         * 65707F → 4E5765（2026-11-01）。
+         *
+         * 原值在"卡片是纯白"的假设下算得 4.77，但真机实测「更新于」只有 **3.46**，
+         * 因为它压在 MeshBackdrop 的光斑上（#BBD1FF 以 0.85 alpha 叠在近白底 → 实测背景 214），
+         * 而不是纯白。低于 WCAG AA 小字门槛 4.5。
+         *
+         * 为什么改文字而不是改背景：要让那块背景亮到 241，光斑 alpha 得从 0.85 降到 0.1 以下，
+         * 等于把光斑抹掉——而光斑正是"玻璃看起来像玻璃"的前提，不能动。
+         *
+         * 同时把 textSecondary 一并下调（4A5468 → 343E52），否则三级加深后会与二级撞色，
+         * 二级/三级的层次会压平。现在三级的亮度梯度是 24 / 61 / 86，仍可辨。
+         */
+        val textTertiary = Color(0xFF4E5765)
         val divider = Color(0x1A000000)
     }
 

@@ -174,7 +174,16 @@ def main():
         all_ok = all_ok and ok
         print(f"{name:<10}{ratio:>8.2f}:1 {'通过' if ok else '未达标':<6}  {detail} (门槛 {threshold})")
     print("-" * 62)
-    print("结论：" + ("全部达标" if all_ok else "存在未达标项"))
+    measured = [r for n, r, _ in results if r is not None]
+    if not measured:
+        # 全部跳过时必须显式说"无数据"。之前这里直接落到"全部达标"，
+        # 在设备停在别的页面时会给出一个漂亮但完全错误的结论。
+        conclusion = "无有效数据（未找到任何目标元素，请确认停在「概览」页）"
+    elif all_ok:
+        conclusion = "全部达标"
+    else:
+        conclusion = "存在未达标项"
+    print("结论：" + conclusion)
     print(json.dumps({"label": args.label,
                       "items": [{"name": n, "ratio": r} for n, r, _ in results]},
                      ensure_ascii=False))

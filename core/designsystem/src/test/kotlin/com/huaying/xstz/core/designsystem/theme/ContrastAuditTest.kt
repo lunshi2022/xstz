@@ -191,4 +191,32 @@ class ContrastAuditTest {
             }
         }
     }
+
+    /**
+     * 真实背景场景：文字底下不是"主题背景色"，而是 **MeshBackdrop 的光斑**。
+     *
+     * 这条用例补的是原来的盲区（TEST_PLAN T-006）。旧审计一律把
+     * `XstzColors.Light.background`（接近纯白）当底色，算出 tertiary 有 4.77，于是"全绿"；
+     * 但页头「更新于」压在光斑上——`meshLight[0]`(#BBD1FF) 以 0.85 alpha 叠在近白底，
+     * 真机截图实测背景亮度只有 **214**，同一颜色实测 3.46，caption 明显偏淡。
+     *
+     * 这里直接用实测值 214 当底色，而不是去模拟光斑的径向渐变——
+     * 渐变各点 alpha 不同，模拟得再准也不如"用最差实测值卡死"可靠。
+     */
+    @Test
+    fun `light - tertiary text meets 4_5 over measured mesh backdrop`() {
+        // 0xD6 = 214，来自真机截图采样（浅色主题 + 概览页头 + 默认光斑）
+        val measuredBackdrop = Color(0xFFD6D6D6)
+        val ratio = contrast(XstzColors.Light.textTertiary, measuredBackdrop)
+        assertTrue("light/tertiary on mesh backdrop(214): $ratio < 4.5", ratio >= 4.5)
+    }
+
+    /** 二级文字在最差背景下仍要明显强于三级，否则层次会塌（这次改动特意保住的）。 */
+    @Test
+    fun `light - secondary text stays stronger than tertiary on mesh backdrop`() {
+        val measuredBackdrop = Color(0xFFD6D6D6)
+        val secondary = contrast(XstzColors.Light.textSecondary, measuredBackdrop)
+        val tertiary = contrast(XstzColors.Light.textTertiary, measuredBackdrop)
+        assertTrue("secondary($secondary) 应明显强于 tertiary($tertiary)", secondary > tertiary)
+    }
 }
