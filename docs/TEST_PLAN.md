@@ -83,8 +83,35 @@ Charts / Rebalance / TargetAllocation / Settings / OperationLog / Onboarding。
 
 ### 2.1 阶段 5「发布准备」——未开始
 1. **release 签名**：配置已就位（`hasReleaseKey` 分支），但无 release key，当前产物未签名、无法安装
-2. **Baseline Profile 真机生成**：现有为手写种子（仅 4 条类规则），需跑 `:benchmark` 的 `BaselineProfileGenerator` 产出完整 profile
+2. **Baseline Profile 真机生成**：已把采集链路全部打通到设备侧最后一步，**卡在设备兼容性**（详见下表）
 3. **冷启动 <1.2s**：依赖上一项生效后才能实测
+
+#### Baseline Profile 采集：已解决的问题与剩余阻塞（2026-11-01）
+
+为跑通 `:benchmark:connectedBenchmarkAndroidTest`，逐个排掉 9 个真实障碍。这些都不是"环境问题"，
+而是配置缺失，换任何设备都会遇到，因此已固化进代码：
+
+| # | 现象 | 根因 | 处理 |
+|---|---|---|---|
+| 1 | `checkTestedAppObfuscation` 失败 | App 的 benchmark 变体开了 R8，测试模块没开 | 两边统一不混淆（见下条说明） |
+| 2 | 测试模块 minify 报缺类 | `com.android.test` 在 AGP 9.1 下**不应用** `buildTypes.proguardFiles`，规则文件根本没进 R8 输入 | 放弃给测试包加 keep 规则，改为两边都不开 R8 |
+| 3 | `Permission Denial ... signature matching` | 测试 APK 用 debug 签名，被测 App 用 release 签名，Android 禁止跨签名插桩 | 测试模块也读 `keystore.properties`，共用 release 密钥 |
+| 4 | `Failed to grant permissions` | `BaselineProfileRule` 会授予 `READ/WRITE_EXTERNAL_STORAGE`，而 App 未声明这两个权限，`pm grant` 静默空操作后被判定失败 | 在 `app/src/benchmark/AndroidManifest.xml` 声明（仅 benchmark 变体） |
+| 5 | `Could not parse androidx.benchmark.profiling.mode=baselineprofile` | 该参数值不是合法枚举，且 `BaselineProfileRule` 自己决定采集模式 | 删掉该 runner 参数 |
+| 6 | `Instrumentation run failed due to Process crashed` | `com.android.test` 默认把 instrumentation 的 `targetPackage` 钉成被测 App，测试与 App 同进程；基准测试杀 App 测冷启动时把自己一起杀掉 | 开 `experimentalProperties["android.experimental.self-instrumenting"] = true` |
+| 7 | 同上，尝试在清单手写 `<instrumentation>` | AGP 在清单合并**之后**注入，`tools:replace` 也压不住 | 放弃清单方案，只能走第 6 条开关 |
+| 8 | 生成器点了「图表」Tab 无效 | `Shell.kt` 里实际文案是「走势」，`By.text` 匹配不到会静默跳过 | 修正文案，并在注释里写明"必须与 NavTab 标题一致" |
+| 9 | 首屏等待条件永不满足 | 概览页标题实际是「概览」，生成器写成「资产概览」 | 改为正则 `概览|看懂你的每一笔投资` |
+
+**剩余阻塞（设备侧，非代码问题）**：
+走到最后一步 `pm dump-profiles` 时，设备（小米 23116PN5BC / HyperOS，API 36）返回
+`Waiting for app processes to flush profiles...`，`/data/misc/profman/com.huaying.xstz-primary.prof.txt`
+始终为 **0 字节**。已验证 `<profileable android:shell="true"/>` 确实进了 APK 清单、电量白名单已放行、
+应用包名与签名均正常——这是 MIUI 定制 `pm` 对 profile dump 的异步行为与 `androidx.benchmark` 的期望不符。
+
+**下一步**：在 AOSP 系设备或模拟器上重跑 `:benchmark:connectedBenchmarkAndroidTest` 即可产出。
+系统镜像 `android-36` 仍在，重建 AVD 后可直接采集（本机 AVD 已于 2026-11-01 按要求删除）。
+在拿到完整 profile 前，`app/src/main/baseline-prof.txt` 继续使用手写种子。
 
 ### 2.2 已知小差异（4 项，来自 COMPLIANCE_CHECK 第四节）
 4. 后台降频无独立开关（前台档位已有）

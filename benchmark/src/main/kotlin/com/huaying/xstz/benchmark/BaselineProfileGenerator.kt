@@ -29,11 +29,11 @@ class BaselineProfileGenerator {
     fun startup() = baselineRule.collect(
         packageName = "com.huaying.xstz",
     ) {
-        // 冷启动：等待首屏（持仓列表「资产概览」或引导页「看懂你的每一笔投资」）出现。
+        // 冷启动：等待首屏出现。未走完引导时是引导页标题，已配置过则是「概览」标题。
         // BySelector 没有 .or()，用正则匹配二选一文本。
         device.wait(
             Until.hasObject(
-                By.text(Pattern.compile("资产概览|看懂你的每一笔投资")),
+                By.text(Pattern.compile("概览|看懂你的每一笔投资")),
             ),
             10_000,
         )
@@ -51,8 +51,9 @@ class BaselineProfileGenerator {
         }
         device.waitForIdle()
 
-        // 切换 Tab，覆盖各页的合成路径
-        listOf("持仓", "图表", "再平衡", "设置").forEach { label ->
+        // 切换 Tab，覆盖各页的合成路径。
+        // 文案必须与 Shell.kt 里 NavTab 的 title 完全一致，否则静默跳过、profile 缺路径。
+        listOf("持仓", "走势", "再平衡", "设置").forEach { label ->
             if (device.wait(Until.hasObject(By.text(label)), 5_000)) {
                 device.findObject(By.text(label))?.click()
                 device.waitForIdle()

@@ -1,0 +1,29 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      仅 benchmark 变体生效的清单覆盖（AGP 会合并进 benchmark 产物，release 包不含这些内容）。
+
+      1) profileable：基准采集必须允许 shell 剖析本应用。
+         缺了它，`pm dump-profiles` 只会打印
+         "Waiting for app processes to flush profiles..."，拿不到 profile 文件
+         （实测报错：Expected `pm dump-profiles` stdout to be either blank or
+         `Profile saved to ...`）。
+      2) 存储权限：BaselineProfileRule 采集前会授予 READ/WRITE_EXTERNAL_STORAGE。
+         而 pm grant 对「未在清单声明」的权限是静默空操作，规则随后校验"是否真的授予了"
+         就会失败，报 Failed to grant permissions。
+    -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <application>
+        <profileable
+            android:shell="true"
+            tools:targetApi="q" />
+    </application>
+
+</manifest>

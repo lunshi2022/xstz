@@ -72,20 +72,25 @@ android {
                 "proguard-rules.pro",
             )
         }
-        // 基准生成器（benchmark 模块）按同名 buildType 对齐变体：
-        // 与生产 release 同源（同样开启 R8），便于在真机上产出与生产一致的基线 profile。
-        // matchingFallbacks 让库依赖（core:*）无需各自声明 benchmark 变体，回落到 release 即可。
+        // 基准生成器（benchmark 模块）按同名 buildType 对齐变体。
+        //
+        // 这里**故意不开 R8**，原因不是偷懒：
+        // AGP 的 checkTestedAppObfuscation 要求「被测 App」与「测试 APK」的混淆状态一致，
+        // 而 com.android.test 模块在 AGP 9.1 下不认 buildTypes.proguardFiles
+        // （实测规则文件根本没进 R8 输入，导致 minify 缺类直接失败）。
+        // 两边都不混淆是最稳的组合。
+        //
+        // 采集到的规则不会因此作废：release 打包时由 AGP 的 R8 profile 重写
+        // 按 mapping.txt 映射成混淆后的名字（见 gradle.properties 里的
+        // android.experimental.art-profile-r8-rewriting）。
+        // 另：冷启动实测应使用真正的 release 包，而不是这个变体。
         create("benchmark") {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             isDebuggable = false
             matchingFallbacks += listOf("release")
             signingConfig =
                 if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
         }
     }
 

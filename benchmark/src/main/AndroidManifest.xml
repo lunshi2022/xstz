@@ -1,1 +1,12 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      自插桩：让测试跑在自己的进程里，而不是被测 App 的进程里。
+      原因见 benchmark/build.gradle.kts（AGP 会按 targetProjectPath 注入 targetPackage=被测App，
+      导致基准测试杀 App 时把自己一起杀掉）。
+    -->
+    <instrumentation
+        android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="com.huaying.xstz.benchmark" />
+
+</manifest>
