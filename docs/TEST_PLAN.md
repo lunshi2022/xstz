@@ -256,9 +256,9 @@ Charts / Rebalance / TargetAllocation / Settings / OperationLog / Onboarding。
 | 关于页 | `2.0.0 (200 · Alpha)`、开发者 `lunshi2022` ✅ |
 | 投资建议文案 | 已生效：「有持仓偏离目标，可查看再平衡差额」 ✅ |
 
-**遗留**：旧 v1.6.5 因签名不同无法覆盖升级（见 T-002）。
+**已知代价**：旧 v1.6.5 因签名不同无法覆盖升级，已决策接受（见 T-002）。
 
-### T-002 · 签名不一致导致旧版无法覆盖升级
+### T-002 · 签名不一致导致旧版无法覆盖升级（已决策：不修复）
 
 | 字段 | 内容 |
 |---|---|
@@ -266,9 +266,28 @@ Charts / Rebalance / TargetAllocation / Settings / OperationLog / Onboarding。
 | 现象 | 安装新 release 报 `INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.huaying.xstz signatures do not match newer version` |
 | 复现 | 设备上已装 v1.6.5（versionCode 165，证书 `L=Donglizhen`）→ 安装本 release（证书 `CN=XSTZ`） |
 | 期望 | 沿用同一把密钥签名，老用户可直接覆盖升级 |
-| 根因 | 对外分发版用的是证书 `L=Donglizhen` 的密钥（即 `E:\AI\Project\密钥`），其**口令未留存且无法恢复**；当前只能使用口令已知的 `xstz-release.jks` |
-| 修复 | 需找回旧密钥口令后改 `keystore.properties` 四行并重新构建 |
-| 现状 | 已通过手动卸载旧版绕过，验证得以继续；正式分发前必须解决 |
+| 根因 | 对外分发版用的密钥（`E:\AI\Project\密钥`）口令从未留存；而 PKCS12 无口令无法取出私钥，因此无法再用它签发新包 |
+
+**取证经过（2026-10-31，为“能不能救回来”做完整闭环）**
+
+| 步骤 | 结果 |
+|---|---|
+| 取回官方基线 | 从 GitHub Releases 下载 `xstz-v1.6.5.apk`（6,390,570 字节，sha256 `1b9d5e1e…` 与发行页一致）。`apksigner verify --print-certs` 得证书 DN `L=Donglizhen`、SHA-256 `f8f7c99f95838d337d8c92fb4e01b6dc9a6e811c483a6a357fdd4db672da1d73`。此指纹留档，作为“旧签名”的唯一权威参照 |
+| 找回密钥文件 | **成功**。E 盘回收站 `$Recycle.Bin/<SID>/$RCB9Y45/密钥` 里找回旧密钥本体：PKCS12，2516 字节，MD5 `ab2e1a11…`，原名即 `E:\AI\Project\密钥`；同内容副本另存为 `E:\AI\Project\xstz-release.keystore` |
+| 找口令：git | 失败。旧仓库 21 个提交全在，但 `keystore.properties` 一直被 gitignore，历史中从未出现 |
+| 找口令：IDE / 凭据 | 失败。Android Studio 配置里的 `c.pwd` 可用 DPAPI 解开（结构为 `[len=16][IV][688B 密文]`），但它与 `c.kdbx` 并非配对钥匙；Windows 凭据管理器内只有 git 口令 |
+| 找口令：构建产物 | 失败。Gradle `executionHistory.bin` 只存 `storePasswordHash`，不含明文 |
+| 找口令：其它 | 失败。PowerShell 历史、桌面/文档笔记、全局 gradle.properties 均无 |
+| 暴力尝试 | 失败。自写 RFC 7292 PKCS12 MAC 校验器（先用“已知口令 + 已知密钥”自检，确认判定可靠），共试约 **6.2 万**条候选口令（含项目名、证书名、手机号、QQ 号、年份/符号组合等），零命中 |
+| 结论 | 密钥文件在、口令不可得。而私钥取不出就等于这把签名身份不可用 |
+
+| 字段 | 内容 |
+|---|---|
+| **决策（2026-11-01）** | **放弃旧密钥，统一使用 `CN=XSTZ` 新密钥。** 装过 v1.6.5 的用户需卸载重装一次，此后均可用同签名覆盖升级 |
+| 依据 | 老用户规模极小（发行页下载量个位数）；继续投入口令恢复的收益远低于成本；新密钥口令已妥善留存，后续不会重演 |
+| 后续动作 | ① 旧密钥全部副本已销毁（含回收站内 6 份做全零覆写），杜绝“半吊子留着又用不上”；② `keystore.properties` 保持指向新密钥，不动 |
+| 影响面 | 一次性代价，仅限装过 v1.6.5 的设备 |
+| 复发预防 | 新密钥口令只存于 `keystore.properties`（gitignore）；`xstz-release.jks` 另存 `C:\Users\21063\.keystores\` 一份。**密钥永不删除**——删了就再也签不出可升级的包 |
 
 ### T-003 · 概览页「更新于」不随时间老化（诚实性）
 

@@ -41,8 +41,8 @@ Android 14 模块化资产管理 App（A股/ETF/债券/基金），Compose + Mat
   - `C:/Users/21063/.keystores/xstz-release.jks` ← 项目外安全副本（旧项目目录那一份已被用户删除）
   口令仍是 `keystore.properties` 里那组，**不写在任何被 git 跟踪的文件里**（`.workbuddy/` 是被跟踪的）。
 - **路径必须纯 ASCII**：`app/build.gradle.kts` 用 `Properties().load(InputStream)`，按 ISO-8859-1 解码，中文路径会乱码导致签名失败。
-- 另一把 `E:\AI\Project\密钥`（证书 `L=Donglizhen`）才是**对外分发版 v1.6.5（versionCode 165）**用的密钥，但其口令未留存、无法恢复。若日后找回，改 `keystore.properties` 四行即可切回，老用户才能覆盖升级。
-- ⚠️ **密钥删不得**：它是签名身份，删了再也签不出能升级的包，老用户全部断更。即使有备份也建议两处都留（4.4KB，零成本）。
+- **旧密钥已作废并销毁（2026-11-01 决策）**：原 `E:\AI\Project\密钥`（证书 `L=Donglizhen`，v1.6.5 用的那把）口令从未留存，已确认无法恢复（详见 `docs/TEST_PLAN.md` T-002 取证经过）。**旧密钥的全部副本已删除/覆写销毁，不要再去找**——找也找不到了。装过 v1.6.5 的设备需卸载重装一次，此后统一用 `CN=XSTZ` 新密钥覆盖升级。
+- ⚠️ **密钥删不得**：它是签名身份，删了再也签不出能升级的包。当前唯一在用的 `xstz-release.jks`（4.4KB）务必两处都留（仓库根 + `C:\Users\21063\.keystores\`）。
 - release 包已验证：同签名下**可覆盖升级且数据保留**。
 
 ## 已修的真实缺陷（备查）
