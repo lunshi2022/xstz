@@ -82,14 +82,14 @@ Charts / Rebalance / TargetAllocation / Settings / OperationLog / Onboarding。
 ## 二、未完成 / 待完善（明确列出）
 
 ### 2.1 阶段 5「发布准备」——未开始
-1. **release 签名**：配置已就位（`hasReleaseKey` 分支），但无 release key，当前产物未签名、无法安装
-2. **Baseline Profile 真机生成**：已把采集链路全部打通到设备侧最后一步，**卡在设备兼容性**（详见下表）
-3. **冷启动 <1.2s**：依赖上一项生效后才能实测
+1. **release 签名**：✅ 已完成。`keystore.properties` + `CN=XSTZ` 密钥就位，release 包已签名并在真机安装验证
+2. **Baseline Profile 真机生成**：✅ **已完成**。采集到 18,642 条规则，已编入 release 包
+3. **冷启动 <1.2s**：✅ **已达标**。真机 8 次采样中位数 **≈200ms**
 
-#### Baseline Profile 采集：已解决的问题与剩余阻塞（2026-11-01）
+#### Baseline Profile 采集：已解决的 11 个障碍（2026-11-01）
 
-为跑通 `:benchmark:connectedBenchmarkAndroidTest`，逐个排掉 9 个真实障碍。这些都不是"环境问题"，
-而是配置缺失，换任何设备都会遇到，因此已固化进代码：
+为跑通 `:benchmark:connectedBenchmarkAndroidTest`，逐个排掉 11 个真实障碍。这些都不是"环境问题"，
+而是配置缺失或脚本遗漏，换任何设备都会遇到，因此已固化进代码：
 
 | # | 现象 | 根因 | 处理 |
 |---|---|---|---|
@@ -102,16 +102,21 @@ Charts / Rebalance / TargetAllocation / Settings / OperationLog / Onboarding。
 | 7 | 同上，尝试在清单手写 `<instrumentation>` | AGP 在清单合并**之后**注入，`tools:replace` 也压不住 | 放弃清单方案，只能走第 6 条开关 |
 | 8 | 生成器点了「图表」Tab 无效 | `Shell.kt` 里实际文案是「走势」，`By.text` 匹配不到会静默跳过 | 修正文案，并在注释里写明"必须与 NavTab 标题一致" |
 | 9 | 首屏等待条件永不满足 | 概览页标题实际是「概览」，生成器写成「资产概览」 | 改为正则 `概览|看懂你的每一笔投资` |
+| 10 | `pm dump-profiles` 只回 `Waiting for app processes to flush profiles...`，profile 恒为 0 字节（**手机、模拟器完全一样**） | **`BaselineProfileRule.collect` 不会替你启动应用**——启动要由 collect 块显式调用 `startActivityAndWait()`。漏掉这步全程没有目标进程，最后自然无从 dump；但报错是 IllegalStateException，极易被误判为设备兼容性问题（本轮就在这个误判上绕了很久） | collect 块开头补 `pressHome()` + `startActivityAndWait()` |
+| 11 | `Unable to confirm activity launch completion []`（手机与模拟器同样复现） | `androidx.benchmark` **1.3.3** 解析不了 API 36 的 frame timeline 数据；framestats 本身有完整帧（已手工 dump 验证） | 升级 `benchmark` 到 **1.4.1** |
 
-**剩余阻塞（设备侧，非代码问题）**：
-走到最后一步 `pm dump-profiles` 时，设备（小米 23116PN5BC / HyperOS，API 36）返回
-`Waiting for app processes to flush profiles...`，`/data/misc/profman/com.huaying.xstz-primary.prof.txt`
-始终为 **0 字节**。已验证 `<profileable android:shell="true"/>` 确实进了 APK 清单、电量白名单已放行、
-应用包名与签名均正常——这是 MIUI 定制 `pm` 对 profile dump 的异步行为与 `androidx.benchmark` 的期望不符。
+**采集结果（2026-11-01）**
+- 环境：Android 16 (API 36) x86_64 模拟器，benchmark 1.4.1
+- 产物：18,642 条规则（类 + `HSPL` 方法规则），已写入 `app/src/main/baseline-prof.txt`
+- 已验证编入 release 包：`assets/dexopt/baseline.prof` + `baseline.profm`
 
-**下一步**：在 AOSP 系设备或模拟器上重跑 `:benchmark:connectedBenchmarkAndroidTest` 即可产出。
-系统镜像 `android-36` 仍在，重建 AVD 后可直接采集（本机 AVD 已于 2026-11-01 按要求删除）。
-在拿到完整 profile 前，`app/src/main/baseline-prof.txt` 继续使用手写种子。
+**冷启动实测（真机 23116PN5BC，release 包，8 次采样）**
+
+| 序 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| TotalTime (ms) | 339 | 228 | 211 | 189 | 202 | 197 | 203 | 185 |
+
+中位数 **≈200ms**，远优于 1.2s 目标（首次启动含初始化 1482ms，不计入）。
 
 ### 2.2 已知小差异（4 项，来自 COMPLIANCE_CHECK 第四节）
 4. 后台降频无独立开关（前台档位已有）

@@ -36,6 +36,11 @@ android {
     defaultConfig {
         minSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // 采集在模拟器上执行时必须显式忽略 EMULATOR 告警：
+        // benchmark 默认把模拟器视为不可信的测量环境而直接报错，
+        // 但采集基线 profile 只关心"走过哪些代码"，与计时精度无关，可以接受。
+        // 真机上该参数不生效，无副作用。
+        testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR"
         // 基准配置文件由 BaselineProfile 生成器在真机上产出，再拷贝回 app 模块
         targetProjectPath = ":app"
         // 注意：不要在这里设置 androidx.benchmark.profiling.mode。

@@ -29,7 +29,22 @@ class BaselineProfileGenerator {
     fun startup() = baselineRule.collect(
         packageName = "com.huaying.xstz",
     ) {
-        // 冷启动：等待首屏出现。未走完引导时是引导页标题，已配置过则是「概览」标题。
+        /*
+         * 必须先自己把应用拉起来。
+         *
+         * BaselineProfileRule 只负责"开始采集 / 结束采集"，**不会**替你启动应用；
+         * 启动动作要由被测方在 collect 块里显式完成。漏掉这一句的后果很隐蔽：
+         * 全程没有任何目标进程存在，最后 pm dump-profiles 只回一句
+         * "Waiting for app processes to flush profiles..."，profile 文件是 0 字节，
+         * 抛出的却是 IllegalStateException（看起来像环境问题，实为脚本缺一步）。
+         * 手机与模拟器表现完全一致，正是这个原因。
+         *
+         * pressHome 先回桌面，保证 startActivityAndWait 测的是真正的冷启动。
+         */
+        pressHome()
+        startActivityAndWait()
+
+        // 等待首屏出现。未走完引导时是引导页标题，已配置过则是「概览」标题。
         // BySelector 没有 .or()，用正则匹配二选一文本。
         device.wait(
             Until.hasObject(
