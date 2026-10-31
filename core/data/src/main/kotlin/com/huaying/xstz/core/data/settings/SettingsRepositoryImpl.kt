@@ -89,14 +89,15 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     companion object {
-        const val THEME_AUTO = 0
-        const val THEME_LIGHT = 1
-        const val THEME_DARK = 2
+        // 常量以 domain 接口为准，这里只做转发。
+        // 直接在实现类里另写一套值，迟早会出现"UI 用 1 表示浅色、实现用 2"这类错位。
+        const val THEME_AUTO = SettingsRepository.THEME_AUTO
+        const val THEME_LIGHT = SettingsRepository.THEME_LIGHT
+        const val THEME_DARK = SettingsRepository.THEME_DARK
 
-        const val THRESHOLD_ABSOLUTE = 0
-        const val THRESHOLD_RELATIVE = 1
+        const val THRESHOLD_ABSOLUTE = SettingsRepository.THRESHOLD_MODE_ABSOLUTE
+        const val THRESHOLD_RELATIVE = SettingsRepository.THRESHOLD_MODE_RELATIVE
 
-        /** 默认 5% 偏离触发提醒，是基金组合再平衡的常见经验值 */
-        const val DEFAULT_THRESHOLD = 0.05
+        const val DEFAULT_THRESHOLD = SettingsRepository.DEFAULT_THRESHOLD
     }
 }

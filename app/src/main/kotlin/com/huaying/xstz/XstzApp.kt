@@ -23,6 +23,14 @@ import com.huaying.xstz.core.ui.MainTab
 import com.huaying.xstz.core.ui.MeshBackdrop
 import com.huaying.xstz.feature.overview.OverviewScreen
 import com.huaying.xstz.feature.overview.OverviewViewModel
+import com.huaying.xstz.feature.charts.ChartsScreen
+import com.huaying.xstz.feature.charts.ChartsViewModel
+import com.huaying.xstz.feature.rebalance.RebalanceScreen
+import com.huaying.xstz.feature.rebalance.RebalanceViewModel
+import com.huaying.xstz.feature.transactions.HoldingsScreen
+import com.huaying.xstz.feature.settings.SettingsScreen
+import com.huaying.xstz.feature.settings.SettingsViewModel
+import com.huaying.xstz.feature.transactions.HoldingsViewModel
 import dev.chrisbanes.haze.rememberHazeState
 
 /**
@@ -69,7 +77,53 @@ fun XstzApp(
                                 onSeedSamples = vm::seedSamples,
                             )
                         }
-                        else -> PlaceholderTab(tab)
+                        MainTab.Holdings -> {
+                            val vm: HoldingsViewModel = hiltViewModel()
+                            val state by vm.state.collectAsStateWithLifecycle()
+                            HoldingsScreen(
+                                state = state,
+                                hazeState = hazeState,
+                                onAdd = vm::addHolding,
+                                onTrade = vm::recordTrade,
+                                onDelete = vm::deleteHolding,
+                                onDismissMessage = vm::dismissMessage,
+                            )
+                        }
+                        MainTab.Charts -> {
+                            val vm: ChartsViewModel = hiltViewModel()
+                            val state by vm.state.collectAsStateWithLifecycle()
+                            ChartsScreen(
+                                state = state,
+                                hazeState = hazeState,
+                                onSelect = vm::select,
+                                onRangeChange = vm::setRange,
+                            )
+                        }
+                        MainTab.Rebalance -> {
+                            val vm: RebalanceViewModel = hiltViewModel()
+                            val state by vm.state.collectAsStateWithLifecycle()
+                            RebalanceScreen(
+                                state = state,
+                                hazeState = hazeState,
+                                onStrategyChange = vm::setStrategy,
+                                onThresholdChange = vm::setThreshold,
+                            )
+                        }
+                        MainTab.Settings -> {
+                            val vm: SettingsViewModel = hiltViewModel()
+                            val state by vm.state.collectAsStateWithLifecycle()
+                            SettingsScreen(
+                                state = state,
+                                hazeState = hazeState,
+                                onThemeChange = vm::setThemeMode,
+                                onPrivacyChange = vm::setPrivacy,
+                                onReduceTransparency = vm::setReduceTransparency,
+                                onExport = vm::export,
+                                onImport = vm::import,
+                                onDismissExport = vm::dismissExport,
+                                onDismissMessage = vm::dismissMessage,
+                            )
+                        }
                     }
                 }
 

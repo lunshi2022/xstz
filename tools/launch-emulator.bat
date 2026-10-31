@@ -2,23 +2,16 @@
 rem ============================================================================
 rem  XSTZ Emulator - single click launcher
 rem
-rem  Double click this file. It opens ONE window (the emulator) and closes
-rem  itself immediately. No black console window left behind, unlike the
-rem  earlier version which wrapped the emulator in "cmd /c ... > log".
+rem  2026-10-31 三次崩溃（0xc0000005 ACCESS_VIOLATION，模块 unknown）都是
+rem  qemu 自身在 swiftshader 软件光栅化时越界。触发点集中在安装 APK 之后，
+rem  因为装包会引起整屏重绘。
 rem
-rem  Why I (the AI) cannot start it for you:
-rem    - bash background  -> emulator inherits the agent's stdout pipe and
-rem                          qemu freezes at the 4396-byte log mark
-rem    - PowerShell Start-Process -> dies on a duplicate http_proxy/HTTP_PROXY
-rem                          key in the host environment block
-rem    - [Diagnostics.Process]::Start -> blocked as "equivalent to Start-Process"
-rem    - schtasks.exe     -> on the security blacklist, explicitly unbypassable
-rem    - cmd.exe          -> blocked from both bash and PowerShell
-rem  So this one double-click is unavoidable. Everything after it is automatic:
-rem  the AI detects the device, installs the APK and takes screenshots.
+rem  因此两处降低渲染压力：
+rem    1. -gpu angle_indirect —— 交给 D3D11/硬件（RTX 3060），不再用 CPU 光栅化
+rem    2. AVD 分辨率已降到 720x1600（原 1080x2400），像素量减少 55%%
+rem  angle 若不可用，请把 -gpu 参数换回 swiftshader_indirect。
 rem
-rem  AVD lives in toolchains\avd, NOT the default .android\avd, because the
-rem  latter got into a state where every file returned Permission denied.
+rem  双击后本窗口立即关闭，只留模拟器窗口。
 rem ============================================================================
 
 set "SDK=C:\Users\21063\toolchains\android-sdk"
@@ -27,6 +20,6 @@ set "ANDROID_SDK_ROOT=%SDK%"
 set "ANDROID_AVD_HOME=C:\Users\21063\toolchains\avd"
 set "PATH=%SDK%\emulator;%SDK%\platform-tools;%PATH%"
 
-start "XSTZ Emulator" "%SDK%\emulator\emulator.exe" -avd xstz -memory 2048 -cores 2 -no-boot-anim -gpu swiftshader_indirect -no-snapshot
+start "XSTZ Emulator" "%SDK%\emulator\emulator.exe" -avd xstz -memory 2048 -cores 2 -no-boot-anim -no-snapshot-save -gpu angle_indirect
 
 exit

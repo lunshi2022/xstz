@@ -11,7 +11,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import com.huaying.xstz.core.data.settings.SettingsRepositoryImpl
 import com.huaying.xstz.core.domain.repository.SettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,8 +42,8 @@ class MainActivity : ComponentActivity() {
             val settings by vm.state.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val dark = when (settings.themeMode) {
-                SettingsRepositoryImpl.THEME_LIGHT -> false
-                SettingsRepositoryImpl.THEME_DARK -> true
+                SettingsRepository.THEME_LIGHT -> false
+                SettingsRepository.THEME_DARK -> true
                 else -> systemDark
             }
             XstzApp(
@@ -57,7 +56,7 @@ class MainActivity : ComponentActivity() {
 }
 
 data class ShellState(
-    val themeMode: Int = SettingsRepositoryImpl.THEME_AUTO,
+    val themeMode: Int = SettingsRepository.THEME_AUTO,
     val reduceTransparency: Boolean = false,
     val reduceMotion: Boolean = false,
 )

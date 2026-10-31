@@ -83,4 +83,21 @@ interface SettingsRepository {
     /** 最近一次成功刷新行情的时间，用于首页"数据新鲜度" */
     fun observeLastSync(): Flow<Long>
     suspend fun setLastSync(timestamp: Long)
+
+    companion object {
+        /*
+         * 常量定义在接口而不是实现类：feature 模块只依赖 domain，
+         * 若从 SettingsRepositoryImpl 取值就必须依赖 core:data，
+         * 分层会立刻破掉（已踩过这个坑）。
+         */
+        const val THEME_AUTO = 0
+        const val THEME_LIGHT = 1
+        const val THEME_DARK = 2
+
+        const val THRESHOLD_MODE_ABSOLUTE = 0
+        const val THRESHOLD_MODE_RELATIVE = 1
+
+        /** 默认 5% 偏离触发提醒，基金组合再平衡的常见经验值 */
+        const val DEFAULT_THRESHOLD = 0.05
+    }
 }
