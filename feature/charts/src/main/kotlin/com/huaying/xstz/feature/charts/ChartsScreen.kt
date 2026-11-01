@@ -247,13 +247,28 @@ private fun ProfitView(
         contentPadding = 16.dp,
     ) {
         Column {
-            val displayProfit = scrubbed?.profit ?: snaps.last().profit
-            val displayRate = if (scrubbed != null) {
-                val base = scrubbed.principal.micros
-                if (base == 0L) 0.0 else scrubbed.profit.micros.toDouble() / base
-            } else {
-                state.portfolioProfitRate
-            }
+            /*
+             * 金额与百分比必须**同一个口径**。
+             *
+             * 原先这里：金额取 `snaps.last().profit`（末快照的累计收益，与所选区间无关），
+             * 百分比却取 `state.portfolioProfitRate`（区间收益 ÷ 首日总资产）。
+             * 两者基准不同，于是 1 月档出现了自相矛盾的一组数：
+             *
+             *     累计收益 +¥6,043.25
+             *     -10.56%            ← 近一个月确实亏了，但旁边却写着赚 6043 元
+             *
+             * 读起来就是"我赚了 6043，收益率是负的"。
+             *
+             * 现在统一按「累计」口径：金额与该日所属快照的累计收益、
+             * 百分比与该快照的累计收益率（profit / principal）同源，
+             * 也与「每日快照」表最后一行、以及概览页的累计收益率对得上。
+             *
+             * 区间口径（区间盈亏、最大回撤、年化波动）在下方「区间统计」里单独呈现——
+             * 那里才是按区间算的，且已明确标注"区间"，不会与这里混淆。
+             */
+            val head = scrubbed ?: snaps.last()
+            val displayProfit = head.profit
+            val displayRate = head.profitRate
 
             Row(verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
@@ -275,7 +290,7 @@ private fun ProfitView(
                         color = palette.change(displayRate),
                     )
                     Text(
-                        if (scrubbed != null) "累计收益率" else "${state.range.label}区间",
+                        "累计收益率",
                         style = XstzType.caption2,
                         color = palette.textTertiary,
                     )
@@ -326,6 +341,20 @@ private fun ProfitView(
                     color = palette.change(state.portfolioProfit.toDouble()),
                     modifier = Modifier.weight(1f),
                 )
+                /*
+                 * 区间收益率必须和区间盈亏放在一起——单独的"区间盈亏金额"看不出规模：
+                 * 赚 6000 元对 12 万本金是 5%，对 100 万本金只有 0.6%。
+                 *
+                 * 注意这个百分比的分母是**首日总资产**，不是本金（本金在区间内会因申赎变化）。
+                 * 上面指标区显示的是"累计收益率"（分母是当前本金），两者不同口径，
+                 * 所以这里明确标「区间」，避免和指标区混为一谈。
+                 */
+                StatCell(
+                    label = "区间收益率",
+                    value = Formats.percent(state.portfolioProfitRate),
+                    color = palette.change(state.portfolioProfitRate),
+                    modifier = Modifier.weight(1f),
+                )
                 StatCell(
                     label = "最大回撤",
                     value = Formats.percent(state.portfolioMaxDrawdown),
@@ -362,6 +391,27 @@ private fun ProfitView(
                     color = palette.down,
                     modifier = Modifier.weight(1f),
                 )
+            }
+            /*
+             * 区间盈亏 = 末快照累计收益 − 首快照累计收益，只反映"这段时间赚亏了多少"，
+             * 不含申购赎回。若区间内有净申购，它会明显小于「总资产变化」——
+             * 1 月档就是这样：区间盈亏 -¥12,971，但总资产只少了 5 千多，
+             * 因为期间又投进去一笔钱。不加这句说明，用户会以为算法算错了。
+             */
+            val firstSnap = state.firstSnapshot
+            val lastSnap = state.lastSnapshot
+            if (firstSnap != null && lastSnap != null) {
+                val assetDelta = lastSnap.totalValue.micros - firstSnap.totalValue.micros
+                if (assetDelta != state.portfolioProfit) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "区间盈亏不含申购赎回；总资产同期变化 " +
+                            Formats.signedCurrency(assetDelta / 10_000.0) +
+                            "，差额为期间投入/取出",
+                        style = XstzType.caption2,
+                        color = palette.textTertiary,
+                    )
+                }
             }
         }
     }
