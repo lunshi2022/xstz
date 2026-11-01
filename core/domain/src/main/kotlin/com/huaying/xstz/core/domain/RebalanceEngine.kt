@@ -136,11 +136,20 @@ object RebalanceEngine {
 
     /**
      * SELL_ONLY：只保留卖出，买入归零。
-     * 现金项不接受卖出——那是应急金，不是可调仓资产。
+     *
+     * 注意：这里**不**对现金类资产做特殊处理。
+     * 旧实现里有一句 `&& !type.isCashLike`，本意是"应急金不动"，但样本里的货币基金
+     * 也归在 CASH 类型下、且目标只有 5%（实际 22%）——它正是"现金类超配"的典型场景，
+     * 用户恰恰希望在 SELL_ONLY 下把它卖掉、把现金腾出来。那句守卫会让 SELL_ONLY 与
+     * BALANCED 行为不一致：BALANCED 会卖超配的货币基金，SELL_ONLY 却不动，于是 SELL_ONLY
+     * 下"需卖出"变成 0、顶部还报"所有持仓都在阈值内"，与事实矛盾（基金明明超配 17pp）。
+     *
+     * 真正"不该卖"的是 value 为 0、低于目标的应急金——它 delta 为正，本就不会被卖，
+     * 所以去掉守卫后行为正确，且 `仅卖出策略不动现金` 用例（现金持仓 value=0）依然成立。
      */
     private fun sellOnly(actionable: List<Draft>): Map<Long, Money> =
         actionable.associate { d ->
-            val sell = if (d.delta.isNegative && !d.holding.type.isCashLike) d.delta else Money.ZERO
+            val sell = if (d.delta.isNegative) d.delta else Money.ZERO
             d.holding.fundId to sell
         }
 

@@ -85,6 +85,23 @@ class RebalanceEngineTest {
     }
 
     @Test
+    fun `仅卖出策略也会卖超配的现金类资产`() {
+        // 复现样本场景：货币基金（CASH 类型）占 40%，目标 30%，明显超配。
+        // SELL_ONLY 必须与 BALANCED 一致地把它卖掉，而不是报"无偏离"。
+        val list = listOf(
+            holding(1, 6_000.0, 0.30),
+            holding(2, 6_000.0, 0.30),
+            holding(3, 8_000.0, 0.30, type = AssetType.CASH),
+        )
+        val plan = RebalanceEngine.plan(list, RebalanceStrategy.SELL_ONLY, thresholdPct = 0.01)
+        val cash = plan.items.first { it.fundId == 3L }
+        assertEquals(ActionType.SELL, cash.action)
+        assertTrue(plan.totalSell.micros > 0L)
+        // 只卖不买：现金净流入为正
+        assertTrue(plan.cashDelta.micros > 0L)
+    }
+
+    @Test
     fun `完全对齐策略允许买入大于卖出`() {
         val list = listOf(holding(1, 9_000.0, 0.5), holding(2, 1_000.0, 0.5))
         val plan = RebalanceEngine.plan(list, RebalanceStrategy.FULL, thresholdPct = 0.05)
